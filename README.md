@@ -11,7 +11,7 @@ A SIT page for the Flaming Cliffs F-15C in DCS World, by the Wild Wolves (127th 
 
 ## Install
 
-1. Download `downloads/F-15C_SIT_WW_v1.0.zip` and unzip it so the folder sits at `Saved Games\DCS\Mods\tech\F-15C SIT (WW)`.
+1. Download the zip from the [1.0 release](https://github.com/WWNyuu/F15C-SIT-WW/releases/tag/1.0) and unzip it so the folder sits at `Saved Games\DCS\Mods\tech\F-15C SIT (WW)`.
 2. Close DCS and double-click `INSTALL.bat` in that folder.
 3. Bind the castle switch and the rest in Options > Controls > F-15C, category "F-15C SIT".
 
@@ -19,7 +19,7 @@ Run `INSTALL.bat` again after every DCS update or repair (it puts the add-on's c
 
 ## Repository
 
-- `downloads/` - the release zip
+- `downloads/` - the release zip (also attached to the GitHub release)
 - `mod/F-15C SIT (WW)/` - the same add-on as source (cockpit device and page, export script, hook, options, installer, DTM Planner)
 - `planner/` - the DTM Planner for the browser
 - `index.html`, `manual.html`, `img/` - the website
