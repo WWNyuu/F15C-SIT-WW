@@ -20,7 +20,7 @@ Run `INSTALL.bat` again after every DCS update or repair (it puts the add-on's c
 ## Repository
 
 - `downloads/` - the release zip
-- `mod/F-15C SIT (WW)/` - the same add-on as source (cockpit device and page, export script, hook, options, installer, DTM Planner, and the Blender script for the display plate in `Tools/`)
+- `mod/F-15C SIT (WW)/` - the same add-on as source (cockpit device and page, export script, hook, options, installer, DTM Planner)
 - `planner/` - the DTM Planner for the browser
 - `index.html`, `manual.html`, `img/` - the website
 
