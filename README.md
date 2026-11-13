@@ -26,4 +26,4 @@ Run `INSTALL.bat` again after every DCS update or repair (it puts the add-on's c
 
 ## Credits
 
-SIT page, export, DTM Planner: Wild Wolves, 127th Vitezovi FAS. Display technique after KRN MODS' MiG-29A(M) Cockpit Modernization. DCS World and the F-15C: Eagle Dynamics. Planner maps: Natural Earth, NOAA DEM. A fan-made add-on, not affiliated with Eagle Dynamics.
+DCS World and the F-15C: Eagle Dynamics. Planner maps: Natural Earth, NOAA DEM. A fan-made add-on, not affiliated with Eagle Dynamics.
