@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pilot Manual - F-15C SIT (WW)</title>
+<meta name="description" content="Pilot manual for the F-15C SIT (WW) add-on: power-up, the SIT page and its symbols, every MPCD page, keybinds, datalink and the DTM Planner.">
+<meta property="og:title" content="Pilot Manual - F-15C SIT (WW)">
+<meta property="og:description" content="Pilot manual for the F-15C SIT (WW) add-on: power-up, the SIT page and its symbols, every MPCD page, keybinds, datalink and the DTM Planner.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/p_sit_threats.jpg">
+<link rel="icon" href="img/p_sit_route.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: a squadron technical bulletin (same family as the MiG-29 WW MFD site): document-control strip, numbered figure plates (SL.), spec sheet, revision table. */
+:root {
+  --paper: #eceef0;
+  --sheet: #f7f8f9;
+  --ink: #1b2537;
+  --ink-2: #4a5568;
+  --rule: #c5cbd3;
+  --red: #b8323f;
+  --blue: #2f5aa3;
+  --screen: #0b0f12;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Consolas", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10151f; --sheet: #161d2a; --ink: #e3e7ee; --ink-2: #a3adbd; --rule: #2c3647;
+    --red: #e26a74; --blue: #7aa2e6; --screen: #05080a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10151f; --sheet: #161d2a; --ink: #e3e7ee; --ink-2: #a3adbd; --rule: #2c3647;
+  --red: #e26a74; --blue: #7aa2e6; --screen: #05080a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--body); margin: 0; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: .01em; text-wrap: balance; margin: 0; line-height: 1.05; }
+p { margin: 0; max-width: 62ch; }
+.mono { font-family: var(--mono); }
+img { display: block; max-width: 100%; height: auto; }
+
+/* document control strip */
+.ctrl { border-bottom: 1px solid var(--rule); font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+.ctrl .wrap { display: flex; flex-wrap: wrap; gap: 8px 28px; padding-block: 12px; }
+.ctrl b { color: var(--ink); font-weight: 400; }
+
+/* hero */
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 48px; padding-block: 56px 48px; align-items: center; }
+.eyebrow { font-family: var(--mono); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--red); }
+.hero h1 { font-size: clamp(52px, 8vw, 96px); text-transform: uppercase; margin-top: 12px; }
+.hero h1 span { color: var(--blue); }
+.hero .lead { font-size: 19px; margin-top: 20px; color: var(--ink); }
+.hero .req { margin-top: 24px; padding: 14px 16px; border-left: 3px solid var(--red); background: var(--sheet); font-size: 15px; color: var(--ink-2); max-width: 62ch; }
+.hero .req strong { color: var(--ink); }
+.hero figure { margin: 0; }
+.shot { background: var(--screen); border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+figcaption { font-family: var(--mono); font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+figcaption b { color: var(--red); font-weight: 400; margin-right: 8px; }
+
+/* spec sheet */
+.specs { border-block: 1px solid var(--rule); background: var(--sheet); }
+.specs .wrap { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding-block: 0; }
+.spec { padding: 22px 16px 20px 0; border-right: 1px solid var(--rule); padding-left: 16px; }
+.spec:first-child { padding-left: 0; }
+.spec:last-child { border-right: 0; }
+.spec .v { white-space: nowrap; font-family: var(--display); font-size: clamp(28px, 3.2vw, 40px); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.spec .v small { font-size: 18px; color: var(--ink-2); margin-left: 3px; }
+.spec .k { font-size: 13px; color: var(--ink-2); margin-top: 8px; line-height: 1.35; }
+
+/* plates */
+.section-head { padding-block: 72px 8px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+.section-head h2 { font-size: clamp(34px, 5vw, 48px); text-transform: uppercase; }
+.section-head .mono { color: var(--red); font-size: 14px; }
+.plate { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; padding-block: 40px; border-top: 1px solid var(--rule); align-items: start; }
+.plate:first-of-type { border-top: 0; }
+.plate.flip .media { order: 2; }
+.plate h3 { font-size: 30px; text-transform: uppercase; margin-bottom: 14px; }
+.plate p + p { margin-top: 12px; }
+.plate ul { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.plate li { padding-left: 22px; position: relative; max-width: 60ch; }
+.plate li::before { content: ""; position: absolute; left: 0; top: .72em; width: 10px; height: 2px; background: var(--red); }
+.btns { font-family: var(--mono); font-size: 14px; color: var(--blue); }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-block: 8px 40px; }
+.trio figure { margin: 0; }
+.trio p { font-size: 15px; color: var(--ink-2); margin-top: 6px; }
+.trio h3 { font-size: 22px; text-transform: uppercase; margin-top: 14px; }
+
+/* install */
+.install { background: var(--sheet); border-block: 1px solid var(--rule); margin-top: 72px; }
+.install .wrap { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; padding-block: 56px; }
+.install h2 { font-size: clamp(34px, 5vw, 48px); text-transform: uppercase; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; display: grid; gap: 18px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
+.steps li::before { content: counter(s); font-family: var(--display); font-size: 34px; font-weight: 600; color: var(--red); line-height: 1; }
+.steps b { display: block; font-weight: 600; }
+.steps span { color: var(--ink-2); font-size: 15px; }
+
+/* revisions */
+.rev-wrap { overflow-x: auto; margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+th, td { text-align: left; padding: 12px 16px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--mono); font-weight: 400; font-size: 13px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+td:first-child { font-family: var(--mono); color: var(--red); white-space: nowrap; width: 72px; }
+.credits { padding-block: 56px 72px; display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 32px; align-items: center; }
+.credits img { width: 120px; }
+.credits p { color: var(--ink-2); font-size: 15px; }
+.credits p + p { margin-top: 8px; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .plate, .install .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .plate.flip .media { order: 0; }
+  .specs .wrap { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .spec:nth-child(3) { border-right: 0; }
+  .spec:nth-child(n+4) { border-top: 1px solid var(--rule); }
+  .spec:nth-child(4) { padding-left: 0; }
+  .trio { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .specs .wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spec { border-right: 0; padding-left: 0; }
+  .spec:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .credits { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* site navigation and download buttons (GitHub Pages) */
+.site-nav { background: var(--sheet); border-bottom: 1px solid var(--rule); }
+.site-nav .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; justify-content: space-between; padding-block: 10px; }
+.site-nav .brand { font-family: var(--display); font-weight: 600; font-size: 20px; text-transform: uppercase; letter-spacing: .02em; color: var(--ink); text-decoration: none; }
+.site-nav nav { display: flex; flex-wrap: wrap; gap: 6px 20px; font-family: var(--mono); font-size: 14px; }
+.site-nav nav a { color: var(--ink-2); text-decoration: none; }
+.site-nav nav a:hover, .site-nav nav a[aria-current] { color: var(--blue); }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 4px; font-family: var(--mono); font-size: 15px; text-decoration: none; border: 1px solid var(--blue); color: var(--blue); }
+.btn.primary { background: var(--blue); color: var(--paper); }
+.btn small { opacity: .8; font-size: 12px; }
+.btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+/* trailer */
+.trailer { padding-bottom: 8px; }
+.trailer figure { margin: 0; }
+.trailer .shot { aspect-ratio: 16 / 9; }
+.trailer video { display: block; width: 100%; height: 100%; background: var(--screen); }
+
+
+/* F-15C SIT: DTM Planner showcase and small additions */
+.dtm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-block: 8px 24px; }
+.dtm-grid figure { margin: 0; }
+.dtm-grid h3 { font-size: 22px; text-transform: uppercase; margin-top: 14px; }
+.dtm-grid p { font-size: 15px; color: var(--ink-2); margin-top: 6px; }
+.shot.light { background: #0e1116; }
+.key { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 24px; margin-top: 18px; font-size: 14px; }
+.key div { display: flex; gap: 10px; align-items: center; }
+.sw { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+@media (max-width: 860px) { .dtm-grid { grid-template-columns: minmax(0, 1fr); } .key { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+</style>
+<style>
+.man { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding-block: 40px 80px; }
+.toc { position: sticky; top: 16px; align-self: start; font-family: var(--mono); font-size: 14px; }
+.toc b { display: block; color: var(--red); font-weight: 400; letter-spacing: .1em; text-transform: uppercase; font-size: 12px; margin-bottom: 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.toc a { color: var(--ink-2); text-decoration: none; }
+.toc a:hover { color: var(--blue); }
+.doc { max-width: 760px; min-width: 0; }
+.doc h1 { font-size: clamp(40px, 6vw, 64px); text-transform: uppercase; }
+.doc h2 { font-size: clamp(28px, 4vw, 38px); text-transform: uppercase; margin: 56px 0 14px; padding-top: 14px; border-top: 1px solid var(--rule); scroll-margin-top: 16px; }
+.doc p, .doc li { max-width: 68ch; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { padding-left: 22px; }
+.doc li { margin: 4px 0; }
+.doc a { color: var(--blue); }
+.doc code { font-family: var(--mono); font-size: .95em; background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; padding: 0 4px; overflow-wrap: anywhere; }
+.fig { margin: 24px 0 8px; max-width: 520px; }
+.fig.wide { max-width: 100%; }
+.fig .shot { width: fit-content; max-width: 100%; }
+.fig.wide .shot { background: #0e1116; }
+.doc .legend { margin: 8px 0 24px; padding: 14px 16px 14px 40px; background: var(--sheet); border-left: 3px solid #e8a12a; font-size: 15px; max-width: 520px; }
+.doc .legend li { margin: 2px 0; }
+.doc .legend li::marker { font-family: var(--mono); color: #c47f0e; font-weight: 600; }
+.tbl { overflow-x: auto; margin: 16px 0; }
+.tbl table { min-width: 0; }
+.lead2 { font-size: 18px; color: var(--ink-2); margin-top: 12px; }
+@media (max-width: 860px) { .man { grid-template-columns: minmax(0,1fr); gap: 24px; } .toc { position: static; } }
+
+</style>
+</head>
+<body>
+<header class="site-nav"><div class="wrap">
+  <a class="brand" href="./">F-15C SIT (WW)</a>
+  <nav aria-label="Site">
+    <a href="./">Overview</a>
+    <a href="./#pages">Pages</a>
+    <a href="./#dtm">DTM Planner</a>
+    <a href="manual.html" aria-current="page">Pilot manual</a>
+    <a href="downloads/F-15C_SIT_WW_v1.0.zip">Download v1.0</a>
+  </nav>
+</div></header>
+<div class="wrap man">
+  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
+  <article class="doc">
+    <h1>F-15C SIT Pilot Manual</h1>
+    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.0: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C.</p>
+<h2 id="before-you-fly">Before you fly</h2>
+
+<p>You need DCS World with the F-15C from Flaming Cliffs. Nothing else is required; <a href="https://github.com/ciribob/DCS-SimpleRadioStandalone">SRS</a> is used by the RADIO page if you have it.</p>
+<p><strong>Install</strong></p>
+<ol>
+<li>Close DCS.</li>
+<li>Unzip the download so the folder sits at <code>Saved Games\DCS\Mods\tech\F-15C SIT (WW)</code>.</li>
+<li>Double-click <code>INSTALL.bat</code> in that folder. It copies <code>F15SIT_Export.lua</code> and <code>Hooks\F15SIT_hook.lua</code> into <code>Saved Games\DCS\Scripts</code>, adds one line to <code>Export.lua</code> and adds the add-on's controls to the F-15C's controls file in your DCS install (ED's file is kept in the add-on's <code>backup</code> folder).</li>
+</ol>
+<p><strong>After every DCS update or repair</strong> run <code>INSTALL.bat</code> again: DCS puts its own controls file back and the add-on's controls disappear until you do. Your own key assignments are kept and come back with them.</p>
+<p>If the installer cannot find your DCS install, run it from a command prompt in the add-on folder: <code>INSTALL.bat -DcsPath "D:\DCS World"</code>. With DCS under <code>C:\Program Files</code>, right-click <code>INSTALL.bat</code> &gt; Run as administrator.</p>
+<p><strong>Remove:</strong> <code>UNINSTALL.bat</code> takes the controls, the Export.lua line and the scripts out again; then delete the add-on folder.</p>
+<p><strong>Controls:</strong> Options &gt; Controls &gt; F-15C, category <strong>F-15C SIT</strong>. Bind at least the castle switch (up, down, left, right). See <a href="#hotas-and-keybinds">HOTAS and keybinds</a> for the full list.</p>
+
+<h2 id="power-and-start-up">Power and start-up</h2>
+
+<p>The MPCD runs on the jet's power. On a cold start it stays dark until you switch on the electric power or an engine is running. It then runs a short self test (MPCD, SELF TEST, GO; about 3 seconds) and opens on the <a href="#dtm-and-cartridges">DTM page</a>, so you can load your cartridge first. Hot and air starts come up running, on the SIT page.</p>
+<p>With power on and the engines still off, every page works: you can tune the radios before engine start.</p>
+<p><strong>Below the display</strong></p>
+<ul>
+<li><strong>OFF / NIGHT / DAY knob:</strong> left click turns it toward OFF, right click toward DAY. OFF switches the display off; turning it back on runs the self test again. NIGHT is about a third of DAY's brightness.</li>
+<li><strong>BRT rocker:</strong> left click brighter, right click dimmer, ten steps.</li>
+</ul>
+<p>Without power, the add-on's buttons and keybinds do nothing. While the display is off or starting, its buttons and the SIT page's HOTAS functions wait; the radio, countermeasure and jettison binds keep working as long as the jet has power.</p>
+
+<h2 id="the-bezel">The bezel and moving between pages</h2>
+
+<figure class="fig wide"><div class="shot"><img src="img/cockpit_wide.jpg" alt="The left panel of the F-15C with the add-on&#x27;s MPCD" width="1800" height="753" loading="lazy"></div><figcaption>The add-on's MPCD on the F-15C's lower-left display, with the knob and BRT rocker below it</figcaption></figure>
+<p>Twenty buttons around the display, five on each side: top T1–T5 (left to right), bottom B1–B5, left L1–L5 and right R1–R5 (top to bottom). Each page labels the buttons it uses next to them. All of them are clickable and can be bound (category F-15C SIT, "MPCD Lower Left").</p>
+<p><strong>MENU</strong> (R5 on the SIT page, the <code>M</code> button on the other pages) leads everywhere:</p>
+<div class="tbl"><table><thead><tr><th>Button</th><th>MENU page</th></tr></thead><tbody>
+<tr><td>T1</td><td>CRS STR: course line from the ownship to the active steerpoint on SIT</td></tr>
+<tr><td>T2</td><td>RADIO</td></tr>
+<tr><td>T4 / T5</td><td>ENTER NET / RESET IPF (datalink net entry messages)</td></tr>
+<tr><td>L1</td><td>ARMT (A/A page)</td></tr>
+<tr><td>L2</td><td>BIT</td></tr>
+<tr><td>L3</td><td>SIT</td></tr>
+<tr><td>L4</td><td>WPN (A/G weapon video, no video in the C)</td></tr>
+<tr><td>L5</td><td>DTM</td></tr>
+<tr><td>R1 / R2 / R3</td><td>TIME DATE / OWN DATA / FLIGHT DATA</td></tr>
+<tr><td>R4</td><td>SIT SET (SIT settings)</td></tr>
+<tr><td>B1, B2 / B4</td><td>Voice channel, up / down</td></tr>
+<tr><td>B5</td><td>AUTO RANGE on / off</td></tr>
+</tbody></table></div>
+<p>The castle switch also moves between pages: right on the radar (VSD) cursor opens the A/A page, left on the A/A page goes back to SIT, and castle up always brings the SIT page with the cursor.</p>
+
+<h2 id="sit-page">SIT page</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_sit_hook.jpg" alt="SIT page at 160 NM with the cursor on a contact" width="1000" height="1000" loading="lazy"></div><figcaption>SIT page at 160 NM, the cursor on a friendly F-15E</figcaption></figure><ol class="legend"><li>Top left: time (Zulu or local, set on TIME / DATE). With the cursor on a contact: its data block (identity and name, bearing / range, altitude in thousands of feet and speed, aspect).</li><li>Top right: the range in NM from your jet to the top of the SIT area; below it in cyan the cursor's bearing and range from you (no cursor: the active steerpoint).</li><li>Cyan lines: the edges of your radar's scan, out to its range scale.</li><li>Left: L5 SET opens SIT SETTINGS; below it your missiles (A AIM-120, M AIM-9, S AIM-7) and gun rounds (G).</li><li>Right: R3 AUTO / MAN range, R5 MENU. Bottom right: chaff (C) and flares (F), the selected CMD program, RWR filter, ICS bands, the bullseye readout in yellow (the cursor from the bullseye) and the master mode.</li></ol>
+<p><strong>Symbols</strong></p>
+<div class="tbl"><table><thead><tr><th>Symbol</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>green circle</td><td>Friendly. Solid: on your radar; dotted: datalink only. A dot inside: AWACS (large circle) or a friendly datalink fighter.</td></tr>
+<tr><td>red triangle</td><td>Hostile, pointing along its course. Solid: on your radar; dotted: datalink.</td></tr>
+<tr><td>white square</td><td>Unknown: not identified. Solid: on your radar only; dotted: datalink.</td></tr>
+<tr><td>cyan circle + number</td><td>Your flight members (see <a href="#flight-data">FLIGHT DATA</a>).</td></tr>
+<tr><td>course tick, number</td><td>A short line shows where a moving contact is heading; the number below is its altitude in thousands of feet.</td></tr>
+<tr><td>white brackets, blue line</td><td>The target your radar is locked on, and the line from you to it.</td></tr>
+<tr><td>red ring, label</td><td>Enemy SAM site and its engagement ring (brighter while you are inside it).</td></tr>
+<tr><td>yellow triangles, line</td><td>Your route; the active steerpoint has a second, larger triangle.</td></tr>
+<tr><td>yellow double circle</td><td>Bullseye.</td></tr>
+<tr><td>cyan lines, labels</td><td>Mission drawings or your cartridge's lines (FLOT, borders, areas, rings).</td></tr>
+<tr><td>missile mark, line, A 23</td><td>Your missile in flight, the line to its target, and the seconds to impact.</td></tr>
+<tr><td>x, M1 045/12</td><td>Mark point with its number and bearing / range from you.</td></tr>
+</tbody></table></div>
+<p><strong>Range and view</strong></p>
+<ul>
+<li>Centred: 5, 10, 20, 40, 80, 160 NM to the top of the area. Decentred (castle right while the SIT page has the cursor): your jet moves down and the steps become 7, 15, 30, 60, 120, 240 NM.</li>
+<li>Change the range with <code>SIT Range Increase / Decrease</code>, with the radar's zoom keys while the SIT page has the cursor, or by pushing the cursor into the top or bottom edge. AUTO (R3) makes the range follow the radar's range scale.</li>
+<li>EXP (castle left with the cursor): 10 NM around the cursor. F5 (castle down): 5 NM around your formation.</li>
+</ul>
+<p><strong>The cursor</strong></p>
+<p>Normally the SIT page's cursor shows where the radar (VSD) cursor is. <strong>Castle up</strong> gives the cursor to the SIT page (it turns solid): the jet's TDC slew now moves it across the SIT page and the radar cursor stays where it is. Castle up again, or leaving the SIT page, gives it back to the radar. <code>SIT Cursor</code> keys and axes move it too.</p>
+<p>Put the cursor on a contact for its data block. <code>SIT Mark Point</code> drops a mark at the cursor (or under you without one); <code>SIT Delete Mark Point</code> removes the mark nearest the cursor, else the newest.</p>
+<figure class="fig"><div class="shot"><img src="img/p_sit_route.jpg" alt="SIT page at 40 NM with route, SA-11 ring and bullseye" width="1000" height="993" loading="lazy"></div><figcaption>40 NM: route to the active steerpoint, an SA-11 ring, the bullseye and flight member 3</figcaption></figure>
+<p><strong>Declutter</strong> (<code>SIT Declutter</code> keybind, or SIT SETTINGS R2) steps through FULL, NO LINES (no route, drawings, course line), NO DATA (no texts by the symbols), NO RINGS (no threat rings) and MIN (no radar scan lines). A short popup shows the step.</p>
+<p><strong>Where the picture comes from:</strong> your own radar every second; friendlies within 300 km; hostiles that a friendly AWACS, EWR, ship or datalink fighter could see, with their range, radar horizon and the terrain in between; enemy SAM sites once a friendly aircraft could pick up their radar. The AWACS picture is refreshed every 6 seconds and drawn where the contacts were, moved along their course. On servers that block this, see <a href="#datalink-and-servers">Datalink and servers</a>.</p>
+
+<h2 id="sit-settings">SIT settings</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_sets.jpg" alt="SIT SETTINGS page" width="800" height="850" loading="lazy"></div><figcaption>SIT SETTINGS: L5 goes back to SIT from the same button</figcaption></figure>
+<ul>
+<li>Top left: datalink status: <code>DL AWACS F2F</code> (AWACS / EWR and fighter datalink), <code>DL OWN</code> (own radar only), <code>DL EWR REPORTS</code>, <code>DL OFF (SERVER)</code> or <code>NO DL</code>.</li>
+<li>L1 DL, L2 ROUTE, L3 THREAT RINGS, L4 LINES: switch those layers on and off (boxed = on).</li>
+<li>R1 CRS STR: course line to the active steerpoint. R2 DECLUTTER: next step. R3 AUTO RANGE.</li>
+<li>The middle of the page lists what the castle switch does on the SIT page.</li>
+</ul>
+
+<h2 id="aa-and-stores">A/A, combat jettison and weapon load</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_aa.jpg" alt="A/A page" width="800" height="850" loading="lazy"></div><figcaption>A/A page: stores on each station, chaff, flares, gun</figcaption></figure>
+<ul>
+<li>The aircraft outline with each station's store; the selected station is filled. Chaff (CHF) and flares (FLR), gun rounds, ICS (jammer) state and bands B1–B3.</li>
+<li>L3 CBT JETT, L4 WPN LOAD (a list of every station), L5 TRNG, R1 SIT, R2 ICS DCLT.</li>
+<li>R3 shows the selected CMD program (<code>CMDPFM</code>); pressing it opens <a href="#cmd-programs">CMD programs</a>. R4 steps the RWR filter message (GLOBAL ...).</li>
+</ul>
+<figure class="fig"><div class="shot"><img src="img/p_jett.jpg" alt="Combat jettison page" width="800" height="850" loading="lazy"></div><figcaption>Combat jettison: program 1, stations L, C and R</figcaption></figure>
+<p>Two programs (L1 PROG 1, L2 PROG 2). T1–T5 select the station groups L, LC, C, RC, R. <code>Combat Jettison</code> (keybind) jettisons the active program. Flaming Cliffs can only drop the fuel tanks or all stores at once: a program whose stations hold only tanks drops the tanks, any other drops all stores; the bottom line tells you which.</p>
+
+<h2 id="cmd-programs">CMD programs</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_cmds.jpg" alt="CMD programs page" width="800" height="850" loading="lazy"></div><figcaption>CMD programs: PFM is active, editing its chaff</figcaption></figure>
+<ul>
+<li>Six programs, PFM and PRG1–PRG5: chaff and flares per release, interval (s) and cycles.</li>
+<li>L1 UP / L2 DN select a row, T1–T4 select the field (CHF, FLR, INT, CYC), B2 – / B4 + change it. L3 SET ACT makes the row the active program, L4 DFLT resets the row.</li>
+<li>Changes are kept until you load a cartridge (which can carry its own programs).</li>
+<li>Keybinds: <code>CMD - Dispense selected program</code> runs the active program, <code>CMD - Next program</code> selects the next one.</li>
+</ul>
+
+<h2 id="radio">RADIO</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_radio.jpg" alt="RADIO page with SRS" width="912" height="849" loading="lazy"></div><figcaption>RADIO page: UHF-1 on channel 8, UHF-2 on channel 7, editing UHF-1; SRS (right) follows</figcaption></figure>
+<p>UHF-1 (mission comms, SRS radio 1) on the left, UHF-2 (flight, SRS radio 2) on the right, 20 presets each. The presets come from your cartridge, else from the mission for your aircraft; the line at the top says which.</p>
+<ul>
+<li>L1 UP / L2 DN step UHF-1, R1 UP / R2 DN step UHF-2. SRS tunes to the new channel at once.</li>
+<li>Keybinds: <code>UHF-1 Channel Up / Down</code>, <code>UHF-2 Channel Up / Down</code> (they work from any page).</li>
+<li>T1 EDIT 1 / T5 EDIT 2 change the selected channel's frequency: B1 &lt; and B5 &gt; pick the digit, B2 – and B4 + change it, B3 ENTR stores it (225.000–399.975 MHz).</li>
+</ul>
+<p>The add-on talks to SRS through SRS's UDP command port (9040 by default, in the SRS client's settings). It only works while SRS is running and connected.</p>
+
+<h2 id="dtm-and-cartridges">DTM and cartridges</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_dtm.jpg" alt="DTM page" width="800" height="850" loading="lazy"></div><figcaption>DTM page: cartridge MSN loaded</figcaption></figure>
+<p>A cartridge is a <code>.dtc</code> file made with the DTM Planner, in <code>Saved Games\DCS\DTC\F-15C</code> (with its drawings in a <code>.geo.txt</code> file of the same name). MSN is the mission itself: the jet's route from the mission, the mission's bullseye and the mission drawings of your side.</p>
+<ul>
+<li>B3 CART steps through MSN and the cartridges for the current map; the line in the middle shows the choice.</li>
+<li>L1 READ loads it: route, bullseye, drawings, radio presets, CMD programs and jettison programs. <code>LOADED</code> shows the cartridge in use.</li>
+<li>READ STATUS, WRITE, WRITE STATUS and CC BUF CLEAR are there for the look of the real page.</li>
+</ul>
+<p>After a cold start the display opens here: pick your cartridge, READ, then go to SIT.</p>
+
+<h2 id="time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</h2>
+
+<figure class="fig"><div class="shot"><img src="img/p_time.jpg" alt="TIME / DATE page" width="800" height="850" loading="lazy"></div><figcaption>TIME / DATE: R1 ZULU / R2 LOCAL sets the SIT page's clock</figcaption></figure>
+<p><strong>OWN DATA</strong> lists your callsign, pilot, track number, position, altitude, heading, speed, fuel, your position from the bullseye and the active steerpoint.</p>
+<h3 id="flight-data" style="margin-top:28px">FLIGHT DATA</h3>
+<figure class="fig"><div class="shot"><img src="img/p_flt.jpg" alt="FLIGHT DATA page" width="800" height="850" loading="lazy"></div><figcaption>FLIGHT DATA</figcaption></figure>
+<p>L1–L5 list the friendly aircraft near you, players first (marked *); B2 / B4 page through them. Press one to make it a flight member (boxed) or to drop it; the aircraft of your own group are members anyway. Members are numbered 2, 3, 4 ... (by unit name) and drawn in cyan with their number on the SIT page; the right side gives each one's bearing / range, altitude and ground speed. Your picks are remembered between flights.</p>
+<p><strong>BIT</strong> shows CBIT (continuous) or IBIT (a 6 second test) with the jet's failed systems as NO GO lines.</p>
+
+<h2 id="hotas-and-keybinds">HOTAS and keybinds</h2>
+
+<p>Options &gt; Controls &gt; F-15C, category <strong>F-15C SIT</strong>:</p>
+<div class="tbl"><table><thead><tr><th>Control</th><th>What it does</th></tr></thead><tbody>
+<tr><td>Castle Switch - Up</td><td>The SIT page takes the cursor (and is shown); again: back to the radar</td></tr>
+<tr><td>Castle Switch - Right</td><td>SIT cursor: decenter on / off. Radar cursor: A/A page</td></tr>
+<tr><td>Castle Switch - Left</td><td>SIT cursor: EXP on / off. On the A/A page: back to SIT</td></tr>
+<tr><td>Castle Switch - Down</td><td>SIT cursor: F5 (formation) on / off</td></tr>
+<tr><td>SIT Cursor - Up / Down / Left / Right, Horizontal / Vertical (axis)</td><td>Move the SIT cursor (the jet's TDC slew does too)</td></tr>
+<tr><td>SIT Range Increase / Decrease</td><td>SIT range one step (the radar's zoom keys too, while SIT has the cursor)</td></tr>
+<tr><td>SIT Declutter (step)</td><td>Next declutter step</td></tr>
+<tr><td>SIT Mark Point / Delete Mark Point</td><td>Mark at the cursor / remove the nearest mark</td></tr>
+<tr><td>CMD - Dispense selected program / CMD - Next program</td><td>Run / select the countermeasure program</td></tr>
+<tr><td>Combat Jettison (CBT JETT program)</td><td>Jettison the active jettison program</td></tr>
+<tr><td>UHF-1 / UHF-2 Channel Up / Down - SRS</td><td>Step the radio presets</td></tr>
+<tr><td>MPCD Lower Left - Top / Bottom / Left / Right 1-5</td><td>The 20 bezel buttons</td></tr>
+</tbody></table></div>
+
+<h2 id="datalink-and-servers">Datalink and servers</h2>
+
+<p>The datalink picture is built by the add-on's export script from what DCS exports. In multiplayer the server decides: with object export allowed you get the full picture; with it blocked you get your own radar only, and the SIT SETTINGS status says <code>DL OFF (SERVER)</code>.</p>
+<p>Many servers that block export send EWR picture reports as text messages instead. The add-on reads them and draws their contacts on the SIT page (status <code>DL EWR REPORTS</code>), placed from where you were when the report came in and moved along their course for up to two minutes.</p>
+<p>On busy servers the export spaces out DCS's unit scans by what they cost (every 2 to 6 seconds), and pauses them while no page that shows the picture (SIT, FLIGHT DATA, SIT SETTINGS) is on the display.</p>
+
+<h2 id="using-the-dtm-planner">Using the DTM Planner</h2>
+
+<figure class="fig wide"><div class="shot"><img src="img/dtm_route.jpg" alt="DTM Planner route tab" width="1600" height="956" loading="lazy"></div><figcaption>The DTM Planner, ROUTE tab</figcaption></figure>
+<p>Open <code>DTM Planner\F-15C DTM Planner.html</code> from the add-on folder in your browser (or <a href="planner/">the online copy</a>). It works offline; the maps are inside the file.</p>
+<ul>
+<li><strong>Map tools</strong> (left): SELECT, POINT (steerpoints), BULLS, RING, RING? (suspected threat), FLOT, BORDER, AREA. Map layers: F10, TACTICAL, RELIEF, DCS CHARTS, NAVAIDS.</li>
+<li><strong>ROUTE:</strong> cartridge name, steerpoints with names and altitudes (bearing / distance per leg), bullseye.</li>
+<li><strong>PACS:</strong> CMD program and RWR filter at start, the six CMD programs, both combat jettison programs.</li>
+<li><strong>RADIO:</strong> UHF-1 and UHF-2, 20 channels each, with names.</li>
+<li><strong>LINES:</strong> the drawings: rings, FLOT, borders, areas.</li>
+<li><strong>SIT:</strong> a preview of the SIT page from any steerpoint and range.</li>
+<li><strong>Import .miz</strong> takes the route, bullseye and drawings from a mission file. <strong>Save cartridge</strong> downloads <code>NAME.dtc</code> and <code>NAME.geo.txt</code>: put both into <code>Saved Games\DCS\DTC\F-15C</code>.</li>
+</ul>
+<figure class="fig wide"><div class="shot"><img src="img/dtm_pacs.jpg" alt="DTM Planner PACS tab" width="1600" height="956" loading="lazy"></div><figcaption>PACS: CMD programs and combat jettison</figcaption></figure>
+
+<h2 id="options-and-troubleshooting">Options and troubleshooting</h2>
+
+<p><strong>Options &gt; Special &gt; F-15C SIT</strong></p>
+<ul>
+<li><strong>F-15C SIT add-on:</strong> off gives you the stock F-15C; nothing of the add-on runs.</li>
+<li><strong>Datalink:</strong> off shows only your own radar on the SIT page (no AWACS, flight or EWR contacts); everything else stays on.</li>
+<li><strong>Timing and debug logs:</strong> for testing only; leave it off.</li>
+</ul>
+<p><strong>The add-on's controls are gone:</strong> DCS was updated or repaired. Run <code>INSTALL.bat</code> again.</p>
+<p><strong>The SIT page shows no contacts and says NO DL:</strong> the export script is not running. Run <code>INSTALL.bat</code> again; check that <code>Saved Games\DCS\Scripts\Export.lua</code> has the F-15C SIT line.</p>
+<p><strong>The radio page does not tune SRS:</strong> SRS must be running and connected, and its UDP command port must be 9040.</p>
+<p><strong>The display stays dark:</strong> switch on the electric power or start an engine, and check the OFF / NIGHT / DAY knob is not at OFF.</p>
+<p><strong>Logs</strong> for bug reports: <code>Saved Games\DCS\Logs\f15sit_device.log</code>, <code>f15sit_export.log</code>, <code>f15sit_hook.log</code>.</p>
+
+
+  </article>
+</div>
+</body>
+</html>
