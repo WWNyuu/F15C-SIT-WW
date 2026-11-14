@@ -2,7 +2,7 @@
 
 A SIT page for the Flaming Cliffs F-15C in DCS World, by the Wild Wolves (127th Vitezovi FAS). It puts a working tactical situation page and its menu pages on the jet's lower-left MPCD: own radar and datalink picture, threat rings, route and bullseye, missiles in flight, CMD programs, combat jettison, SRS radio presets and data cartridges, with a power-up self test and a clickable brightness knob.
 
-**Website and pilot manual:** the GitHub Pages site of this repository (`index.html`, `manual.html`). The DTM Planner runs online at `planner/`.
+**Website and pilot manual:** the GitHub Pages site of this repository (`index.html`, `manual.html`). The DTM Planner runs online at `planner/`, as part of the WW DTC Planner (MiG-29A, F-15C and Su-27 / J-11A).
 
 ## Requirements
 
@@ -21,7 +21,7 @@ Run `INSTALL.bat` again after every DCS update or repair (it puts the add-on's c
 
 - `downloads/` - the release zip (also attached to the GitHub release)
 - `mod/F-15C SIT (WW)/` - the same add-on as source (cockpit device and page, export script, hook, options, installer, DTM Planner)
-- `planner/` - the DTM Planner for the browser
+- `planner/` - the WW DTC Planner for the browser (F-15C, MiG-29A, Su-27 / J-11A)
 - `index.html`, `manual.html`, `img/` - the website
 
 ## Credits
