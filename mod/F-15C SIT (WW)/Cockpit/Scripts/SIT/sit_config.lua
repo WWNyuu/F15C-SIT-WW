@@ -139,4 +139,9 @@ SIT.RPM_ON    = 50
 SIT.BRT_STEPS = 10
 SIT.NIGHT_K   = 0.35
 SIT.MAX_MSL   = 4
+-- own missile in flight (v1.1): a circle on the flashing fly-out line, an X
+-- once an AIM-120 is this close to its target (MPRF: its own seeker takes
+-- over - FC3 does not tell, so this is the estimate)
+SIT.MSL_MPRF_NM = 7
+SIT.MSL_FLASH_S = 0.5     -- fly-out line: on this long, then off as long
 SIT.MAX_MARKS = 8

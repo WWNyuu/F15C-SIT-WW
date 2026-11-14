@@ -1,5 +1,5 @@
 -----------------------------------------------
--- F-15C SIT (WW) 1.0 - the add-on's cockpit device and its display
+-- F-15C SIT (WW) - the add-on's cockpit devices (SIT, JHMCS) and displays
 -----------------------------------------------
 
 dofile(LockOn_Options.script_path .. "devices.lua")
@@ -18,4 +18,18 @@ if get_aircraft_type() == "F-15C" then
 	indicators = {}
 	indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "SIT/indicator/init_SIT.lua",
 		nil, { ANCHOR_OWN, {} }}
+
+	-- JHMCS helmet display: its device (100 Hz) and the display, which moves
+	-- with the view (world symbols are placed along the view by the device).
+	-- Options > Special > F-15C SIT can switch it off completely.
+	HMD = {}          -- (fresh: the option is read again for every new cockpit)
+	pcall(dofile, LockOn_Options.script_path .. "HMD/hmd_options.lua")
+	if HMD.ENABLED ~= false then
+		creators[devices.HMD] = {"avLuaDevice", LockOn_Options.script_path .. "HMD/hmd_device.lua"}
+		indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "HMD/init_head.lua", nil}
+	end
+	-- its control panel on the left console: the plate's markings (the switch
+	-- and the knob are part of the model)
+	indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "HMD/panel/init_panel.lua",
+		nil, {{"HMDP_C", "HMDP_B", "HMDP_R"}, {}}}
 end

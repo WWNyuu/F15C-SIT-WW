@@ -65,3 +65,31 @@ elements["SIT_MODE_KNOB"] = two_way("MPCD OFF / NIGHT / DAY (left click: toward 
 	SIT_PANEL.MODE_CCW, SIT_PANEL.MODE_CW, 121)
 elements["SIT_BRT"] = two_way("MPCD brightness (left click: brighter, right click: dimmer)",
 	SIT_PANEL.BRT_UP, SIT_PANEL.BRT_DN, 122)
+-- JHMCS panel (left console): power switch (connector HMD_PWR_CLICK, model
+-- argument 131) and brightness knob (HMD_BRT_CLICK, argument 130: turn it
+-- with the mouse wheel or by dragging)
+elements["HMD_PWR_CLICK"] = {
+	class               = {class_type.TUMB, class_type.TUMB},
+	hint                = _("HMD Power ON / OFF"),
+	device              = devices.SIT,
+	action              = {HMD_PANEL.PWR, HMD_PANEL.PWR},
+	arg                 = {HMD_ARG.PWR, HMD_ARG.PWR},
+	arg_value           = {1, -1},
+	arg_lim             = {{0, 1}, {0, 1}},
+	updatable           = true,
+	use_OBB             = true,
+}
+elements["HMD_BRT_CLICK"] = {
+	class               = {class_type.LEV},
+	hint                = _("HMD Brightness"),
+	device              = devices.SIT,
+	action              = {HMD_PANEL.BRT},
+	arg                 = {HMD_ARG.BRT},
+	arg_value           = {1},
+	gain                = {0.0425},        -- (its speed: ED's default is 0.1)
+	arg_lim             = {{0, 1}},
+	updatable           = true,
+	use_OBB             = true,
+	cycle               = false,
+	relative            = {false},
+}

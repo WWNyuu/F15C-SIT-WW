@@ -20,3 +20,18 @@ SIT_HOTAS = {
 -- the MPCD's own controls below the display (clickable): OFF / NIGHT / DAY
 -- knob and the BRT rocker
 SIT_PANEL = {MODE_CW = 3031, MODE_CCW = 3032, BRT_UP = 3033, BRT_DN = 3034}
+
+-- JHMCS (helmet): its panel on the left console (clickable: power switch
+-- 3035, brightness knob 3036; model arguments 131 / 130) and the binds
+-- (category "F-15C SIT"): power, brightness, symbology on/off
+HMD_PANEL = {PWR = 3035, BRT = 3036}
+HMD_ARG = {PWR = 131, BRT = 130}
+HMD_BIND = {BRT_UP = 6150, BRT_DN = 6151, SYM_TOGGLE = 6152, PWR = 6156}
+
+-- auto acq switch (stick) and helmet acquisition (binds, category "F-15C SIT"):
+-- each sends 1 when pressed and 0 when released (the add-on times the press)
+ACQ_BIND = {FWD = 6160, AFT = 6161, DEP = 6162, HACQ = 6163, SSB = 6170, BST = 6171}
+-- weapon select switch (throttle): gun / SRM / MRM; missile reject switch
+WPN_BIND = {GUN = 6164, SRM = 6165, MRM = 6166, REJ = 6167}
+-- target step (TWS: next tracked target), unlock (STT: search, TWS: drop the primary track)
+TGT_BIND = {STEP = 6168, UNLOCK = 6169}

@@ -7,3 +7,4 @@ end
 
 devices = {}
 devices["SIT"] = counter()
+devices["HMD"] = counter()   -- JHMCS helmet display

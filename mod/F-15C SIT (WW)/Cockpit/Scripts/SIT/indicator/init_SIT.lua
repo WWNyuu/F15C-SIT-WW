@@ -1,5 +1,6 @@
 -- F-15C SIT (WW): SIT page indicator
 dofile(LockOn_Options.common_script_path .. "devices_defs.lua")
+dofile(LockOn_Options.common_script_path .. "ViewportHandling.lua")
 
 indicator_type = indicator_types.COMMON
 purposes       = {render_purpose.GENERAL}
@@ -10,3 +11,8 @@ page_subsets = {
 }
 pages        = {{BASE}}
 init_pageID  = 1
+
+-- export to a second monitor: name a viewport F15C_SIT in your monitor
+-- setup (Saved Games\DCS\Config\MonitorSetup), or RIGHT_MFCD as a fallback.
+-- With neither defined nothing changes.
+try_find_assigned_viewport("F15C_SIT", "RIGHT_MFCD")

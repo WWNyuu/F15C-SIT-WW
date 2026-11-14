@@ -594,18 +594,28 @@ do
 end
 
 -- own missiles in flight (v0.9): missile (small diamond), a thin line to
--- its target and the target's time to impact ("A 23"); up to 4
+-- its target and the target's time to impact ("A 23", magenta, left of
+-- the target); up to 4
 for k = 1, SIT.MAX_MSL do
 	local p = "F15SIT_MSL" .. k .. "_"
 	seg_line("sit_msll" .. k, p .. "L", M.white, 0.002)
 	local pp, cc = at(p .. "X", p .. "Y", {{p .. "VIS", 0.5, 1.5}})
 	simple("sit_msl" .. k, "sit_own", {0, 0, 0}, pp, cc)
-	local d = S * 0.45
-	v, i = poly_lines({{0, d}, {d, 0}, {0, -d}, {-d, 0}}, true)
-	mesh("sit_msl" .. k .. "_d", "sit_msl" .. k, "lines", v, i, M.white)
+	-- (v1.1: a circle until MPRF, then an X - MSLk_SYM 1 / 2)
+	local d = S * 0.5
+	simple("sit_msl" .. k .. "_c", "sit_msl" .. k, {0, 0, 0}, {p .. "SYM"}, {vis(0, 0.5, 1.5)})
+	v, i = poly_lines(circle_pts(d, 16), true)
+	mesh("sit_msl" .. k .. "_cm", "sit_msl" .. k .. "_c", "lines", v, i, M.white)
+	simple("sit_msl" .. k .. "_x", "sit_msl" .. k, {0, 0, 0}, {p .. "SYM"}, {vis(0, 1.5, 2.5)})
+	v, i = poly_lines({{-d, -d}, {d, d}}, false)
+	mesh("sit_msl" .. k .. "_xa", "sit_msl" .. k .. "_x", "lines", v, i, M.white)
+	v, i = poly_lines({{-d, d}, {d, -d}}, false)
+	mesh("sit_msl" .. k .. "_xb", "sit_msl" .. k .. "_x", "lines", v, i, M.white)
 	pp, cc = at(p .. "TX", p .. "TY", {{p .. "TVIS", 0.5, 1.5}})
 	simple("sit_mtg" .. k, "sit_own", {0, 0, 0}, pp, cc)
-	text("sit_mtg" .. k .. "_t", "sit_mtg" .. k, {S * 1.2, S * 1.6, 0}, F.white, TXT_SMALL, "LeftCenter", nil, p .. "TXT")
+	-- (v1.1: left of the contact, outside the hook corners, small and
+	-- magenta - a colour the SIT page uses for nothing else)
+	text("sit_mtg" .. k .. "_t", "sit_mtg" .. k, {-S * 1.9, 0, 0}, F.magenta, TXT_TINY, "RightCenter", nil, p .. "TXT")
 end
 -- mark points (keybind): an x and its number, bearing / range from us
 for k = 1, SIT.MAX_MARKS do
@@ -651,12 +661,24 @@ for k = 1, 4 do
 			"F15SIT_HK" .. k .. "_TXT", {"F15SIT_HK_COL", ci - 0.5, ci + 0.5})
 	end
 end
--- bottom left: missiles and gun (A = AIM-120, M = AIM-9, S = AIM-7, G = gun)
+-- bottom left: ownship weapon inventory in one line, as the real page
+-- (v1.1): A = AIM-120, M = AIM-7, S = AIM-9 - count and model letter
+-- ("-" none left), G = gun rounds / 100; the selected one boxed
 simple("sit_sto", "sit_pg", {0, 0, 0}, {"F15SIT_ST_VIS", "F15SIT_DCLT"}, {vis(0, 0.5, 1.5), {"parameter_in_range", 1, -0.5, 0.5}})
-text("sit_st_a", "sit_sto", {-0.751, -0.497, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_ST_A", nil, "A%.0f")
-text("sit_st_m", "sit_sto", {-0.751, -0.552, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_ST_M", nil, "M%.0f")
-text("sit_st_s", "sit_sto", {-0.751, -0.607, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_ST_S", nil, "S%.0f")
-text("sit_st_g", "sit_sto", {-0.751, -0.662, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_ST_G", nil, "G%.0f")
+do
+	local cw, ch = char_w(TXT_DATA), char_h(TXT_DATA)
+	local x0, y, step, pad = -0.751, -0.662, 5 * char_w(TXT_DATA), 0.010
+	for k = 1, 4 do
+		local x = x0 + (k - 1) * step
+		text("sit_inv" .. k, "sit_sto", {x, y, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_INV" .. k .. "_TXT")
+		-- the box: INV_SEL = slot * 10 + characters
+		for n = 2, 5 do
+			local bv, bi = poly_lines({{x - pad, y + ch / 2 + pad}, {x + n * cw + pad, y + ch / 2 + pad},
+				{x + n * cw + pad, y - ch / 2 - pad}, {x - pad, y - ch / 2 - pad}}, true)
+			mesh("sit_invb" .. k .. "_" .. n, "sit_sto", "lines", bv, bi, M.white, nil, {"F15SIT_INV_SEL"}, {vis(0, k * 10 + n - 0.5, k * 10 + n + 0.5)})
+		end
+	end
+end
 -- bottom right: chaff / flares, bullseye readout, master mode
 text("sit_cm_c", "sit_sto", {0.773, -0.331, 0}, F.cfriend, TXT_DATA, "RightCenter", nil, "F15SIT_CHAFF", nil, "C %.0f")
 text("sit_cm_f", "sit_sto", {0.773, -0.386, 0}, F.cfriend, TXT_DATA, "RightCenter", nil, "F15SIT_FLARE", nil, "F %.0f")

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.0
+-- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.1
 --
 -- Based on MiG29DL_Export.lua of the Vitezovi MiG-29 MFD add-on, with the
 -- SAME picture rules (own radar always; friendlies and the hostiles that a
@@ -36,6 +36,10 @@ local DL = {
 	-- fighter-to-fighter datalink: friendly fighters of these types share
 	-- what their radar sees (Lua patterns matched against the unit type)
 	f2f_period      = 2.0,    -- s between fighter datalink updates
+	-- own radar: FC3 lists a contact only when the beam paints it (the VSD
+	-- keeps the hit between sweeps): each is kept this long after its last
+	-- paint, moved on with its velocity
+	radar_mem_s     = 12,
 	threat_period   = 3.0,    -- s between ground-threat line-of-sight checks
 	los_budget      = 2500,   -- max terrain samples per tick, shared by the three refreshes (keeps big missions cheap)
 	-- v1.7.5: one packet's work is spread over several frames (no single
@@ -100,7 +104,9 @@ local DL = {
 -- RWR packets are sent
 -- (RWR packets off: the SIT page shows no RWR, the TEWS scope does)
 -- (f15c_sit_logs: timing and debug logs, for testing; off by default)
-local OPT = {f15c_sit_enabled = true, f15c_sit_datalink = true, f15c_sit_rwr = false, f15c_sit_logs = false}
+-- (f15c_sit_hmd: the JHMCS; off = no view directions sent to the cockpit)
+local OPT = {f15c_sit_enabled = true, f15c_sit_datalink = true, f15c_sit_rwr = false, f15c_sit_logs = false,
+             f15c_sit_hmd = true}
 local function read_options()
 	pcall(function()
 		local lfs_mod = require("lfs")
@@ -444,17 +450,60 @@ local function due(period, offset)
 	return SCHED.n % every == offset % every
 end
 
--- own radar contacts (sensor export)
+-- own radar contacts (sensor export). FC3 lists a contact only at the
+-- moment the beam paints it: each is remembered for DL.radar_mem_s after
+-- its last paint, dead-reckoned with its velocity (locked ones are listed
+-- all the time). A contact without an ID is kept for this call only.
+local RMEM = {t = nil}
 local function own_radar()
 	local radar = {}
+	local t = try(LoGetModelTime) or 0
+	if RMEM.t and t < RMEM.t then RMEM = {t = nil} end         -- (model time started again)
+	RMEM.t = t
 	local ok, tgts = pcall(function() return LoGetTargetInformation and LoGetTargetInformation() end)
 	if ok and type(tgts) == "table" then
 		for _, tg in pairs(tgts) do
-			local x, y, z = pos_of(tg)
+			-- (locks - STT and TWS tracks - come from the locked list below:
+			-- this list keeps a TWS track where it was when it was locked)
+			local x, y, z = nil, nil, nil
+			if (tonumber(tg.flags) or 0) < 8 then x, y, z = pos_of(tg) end
 			if x then
-				local vx, vz = 0, 0
-				if type(tg.velocity) == "table" then vx, vz = tg.velocity.x or 0, tg.velocity.z or 0 end
-				radar[#radar + 1] = {id = tg.ID, x = x, y = y, z = z, vx = vx, vz = vz}
+				local vx, vy, vz = 0, 0, 0
+				if type(tg.velocity) == "table" then vx, vy, vz = tg.velocity.x or 0, tg.velocity.y or 0, tg.velocity.z or 0 end
+				if tg.ID then
+					RMEM[tg.ID] = {t = t, x = x, y = y, z = z, vx = vx, vy = vy, vz = vz}
+				else
+					radar[#radar + 1] = {x = x, y = y, z = z, vx = vx, vz = vz}
+				end
+			end
+		end
+	end
+	-- the locked targets (STT, and each TWS track): their positions here
+	-- follow the targets (v1.1, from the logs: within a few metres)
+	local lk = try(LoGetLockedTargetInformation)
+	if type(lk) == "table" then
+		for _, e in pairs(lk) do
+			local o = type(e) == "table" and (type(e.target) == "table" and e.target or e)
+			if o and o.ID then
+				local x, y, z = pos_of(o)
+				if x then
+					local v = type(o.velocity) == "table" and o.velocity or {}
+					local m = RMEM[o.ID]
+					local vx, vy, vz = tonumber(v.x), tonumber(v.y), tonumber(v.z)
+					-- (no velocity given: from the last position)
+					if not vx and m and t > m.t then vx, vy, vz = (x - m.x) / (t - m.t), (y - m.y) / (t - m.t), (z - m.z) / (t - m.t) end
+					RMEM[o.ID] = {t = t, x = x, y = y, z = z, vx = vx or 0, vy = vy or 0, vz = vz or 0}
+				end
+			end
+		end
+	end
+	local keep = DL.radar_mem_s or 12
+	for id, m in pairs(RMEM) do
+		if id ~= "t" then
+			local age = t - m.t
+			if age > keep or age < 0 then RMEM[id] = nil
+			else
+				radar[#radar + 1] = {id = id, x = m.x + m.vx * age, y = m.y + m.vy * age, z = m.z + m.vz * age, vx = m.vx, vz = m.vz}
 			end
 		end
 	end
@@ -1049,7 +1098,9 @@ local function packet_job(t)
 	do
 		local ok, nav = pcall(function() return LoGetNavigationInfo and LoGetNavigationInfo() end)
 		if ok and type(nav) == "table" and type(nav.SystemMode) == "table" then
-			put(out, "N," .. clean(nav.SystemMode.master or ""))
+			-- (and the submode: "GUN" tells the gun selected - the payload keeps
+			-- the last missile station then)
+			put(out, "N," .. clean(nav.SystemMode.master or "") .. "," .. clean(nav.SystemMode.submode or ""))
 		end
 	end
 	if coal then put(out, "O," .. tostring(coal)) end
@@ -1058,11 +1109,17 @@ local function packet_job(t)
 		local ok, lk = pcall(function() return LoGetLockedTargetInformation and LoGetLockedTargetInformation() end)
 		if ok and type(lk) == "table" then
 			for _, tg in pairs(lk) do
+				-- (FC3: each entry is {target = {...}, DLZ = {...}})
+				-- (+ the launch envelope for the helmet: Raero, Rmin, Rpi, Rtr, metres)
+				local dz = type(tg) == "table" and type(tg.DLZ) == "table" and tg.DLZ or {}
+				tg = type(tg) == "table" and type(tg.target) == "table" and tg.target or tg
 				local x, y, z = pos_of(tg)
 				if x then
 					local vx, vz = 0, 0
 					if type(tg.velocity) == "table" then vx, vz = tg.velocity.x or 0, tg.velocity.z or 0 end
-					put(out, "L," .. fmt(x) .. "," .. fmt(z) .. "," .. fmt(y) .. "," .. fmt(vx) .. "," .. fmt(vz))
+					put(out, "L," .. fmt(x) .. "," .. fmt(z) .. "," .. fmt(y) .. "," .. fmt(vx) .. "," .. fmt(vz) ..
+						"," .. fmt(tonumber(dz.RAERO)) .. "," .. fmt(tonumber(dz.RMIN)) .. "," .. fmt(tonumber(dz.RPI)) ..
+						"," .. fmt(tonumber(dz.RTR)))
 					break
 				end
 			end
@@ -1106,7 +1163,7 @@ local function packet_job(t)
 	end
 	for i = 1, math.min(#thr, DL.max_threats) do
 		local m = thr[i]
-		if not put(out, "G," .. m.lbl .. "," .. fmt(m.x) .. "," .. fmt(m.z) .. "," .. fmt(m.ring)) then break end
+		if not put(out, "G," .. m.lbl .. "," .. fmt(m.x) .. "," .. fmt(m.z) .. "," .. fmt(m.ring) .. "," .. fmt(m.y)) then break end
 	end
 	for i = 1, math.min(#list, DL.max_contacts) do
 		local c = list[i]
@@ -1207,7 +1264,11 @@ end
 -- The commands go to the jet with LoSetCommand, as a key press would. Their
 -- numbers come from Logs\f15sit_icmd.lua, written by the add-on's block in
 -- the F-15C's controls file (DCS knows them there by name).
+local ACQ, acq_end            -- (auto acquisition, below: the device's requests arrive here first)
 local CM = {rx = nil, rx_fail = nil, cmd = nil, cmd_t = -1000, queue = {}, port = 42890}
+-- weapon select switch / missile reject (v1.1): the request from the
+-- device; done by wpn_tick (after the auto acquisition)
+local WPN = {req = nil, goal = nil, n = 0, t_next = 0, gun_on = false}
 local HOLD = {q = false, q_t = -1000}       -- TDC slew held at ~0 while the SIT page has the cursor
 local function cm_cmds(t)
 	if CM.cmd or t - CM.cmd_t < 5 and t >= CM.cmd_t then return CM.cmd end
@@ -1255,6 +1316,7 @@ local function cmds_tick(t)
 				-- every frame; (0,h,v) -> stop, and give the radar the stick back
 				local on, h, v = m:match("^F15SITQ,(%d),?([^,]*),?([^,]*)")
 				if on == "1" then
+					if ACQ.mode then acq_end(c, "SIT took the cursor") end
 					if not HOLD.q then dbg("TDC slew held at 0 every frame") end
 					HOLD.q, HOLD.q_t = true, t
 				else
@@ -1263,6 +1325,11 @@ local function cmds_tick(t)
 						LoSetCommand(c.sel_h, tonumber(h) or 0); LoSetCommand(c.sel_v, tonumber(v) or 0)
 					end
 				end
+			elseif m:sub(1, 7) == "F15SITV" then
+				WPN.req = m:match("^F15SITV,(%u+)")
+			elseif m:sub(1, 7) == "F15SITA" then
+				-- the device: auto acq switch / helmet acquisition
+				ACQ.req = m:match("^F15SITA,(%u+)")
 			elseif m:sub(1, 7) == "F15SITG" then
 				-- the device: datalink picture on screen (1) or not (0)
 				local on = m:sub(9, 9) ~= "0"
@@ -1307,6 +1374,644 @@ local function cmds_tick(t)
 	end
 end
 
+-----------------------------------------------------------------------
+-- AUTO ACQUISITION (v1.1): the auto acq switch and the helmet, after the
+-- real F-15C. FC3 has Boresight and Vertical Scan itself; Supersearch,
+-- Long Range Boresight and the helmet acquisition are done here, as a
+-- pilot would do them: the radar in search, its range scale and scan
+-- height set, the cursor put on the first contact inside the circle and
+-- the lock pressed.
+--   SS  Supersearch: 20 deg circle on the nose, 500 ft - 10 NM
+--   LR  Long Range Boresight: 4 deg circle, 3000 ft - 40 NM: on the
+--       helmet line of sight while the helmet is on, else on the nose
+--   HM  helmet: a 12 deg circle around where the pilot looks, 500 ft - 10 NM
+-- The device asks with "F15SITA,<SS|LR|HM|BST|VS|RTS>". (v1.1: the auto
+-- acq switch forward asks HM, or BST without the helmet; SS has its own
+-- switch and stays on the nose.) Everything it
+-- does and learns goes to Logs\f15sit_acq.log.
+-----------------------------------------------------------------------
+local ACQ_DEF = {
+	SS = {code = 1, cone = math.rad(10), rmin = 150, rmax = 10 * 1852},
+	LR = {code = 2, cone = math.rad(2), rmin = 900, rmax = 40 * 1852},
+	HM = {code = 3, cone = math.rad(6), rmin = 150, rmax = 10 * 1852},
+}
+local ACQ_SCALES = {18520, 37040, 74080, 148160, 296320}   -- (the VSD's range scales, m)
+local ACQ_MEM_S = 6                                        -- (a radar contact is remembered this long)
+local ACQ_MAX_S = 120                                       -- (then it gives up: the TDC is the pilot's again)
+ACQ = {memo = {}, ax = {}, held = false, mode = nil, req = nil, t0 = 0, zoom_t = -1, bvr_n = 0, bvr_t = -1, lock_t = nil, lock_up = false,
+             lock_n = 0, near_n = 0, sx = 1, sy = 1, mon = nil, stuck_t = nil, radar_said = false,
+             tx = 0, ty = 0, cand = false, cx = 0, cy = 0, cz = 0, cr = 0}
+-- the scan height: which command moves it is found out once a flight
+-- (method 1 "Radar Vertical" axis, 2 Scan Zone Up/Down keys; 0 none does)
+local EL = {method = nil, kind = nil, tried = {}, probe = nil, v = 0, sign = 1}
+local acq_n = 0
+local function alog(msg)
+	if acq_n >= 1500 then return end
+	acq_n = acq_n + 1
+	pcall(function()
+		local l = require("lfs")
+		local f = io.open(l.writedir() .. "Logs/f15sit_acq.log", (acq_n == 1) and "w" or "a")
+		if f then f:write(os.date("%H:%M:%S ") .. tostring(msg) .. "\n"); f:close() end
+	end)
+end
+local function clamp1(v) return math.max(-1, math.min(1, v)) end
+local function wrap_pi(a)
+	while a > math.pi do a = a - 2 * math.pi end
+	while a < -math.pi do a = a + 2 * math.pi end
+	return a
+end
+local function acq_master()
+	local nav = try(LoGetNavigationInfo)
+	if type(nav) == "table" and type(nav.SystemMode) == "table" then
+		return tostring(nav.SystemMode.master or ""), tostring(nav.SystemMode.submode or "")
+	end
+	return "", ""
+end
+local function acq_locked()
+	local lk = try(LoGetLockedTargetInformation)
+	return type(lk) == "table" and next(lk) ~= nil
+end
+-- where the pilot looks (unit vector, world), when the view is in our cockpit
+local function acq_look(me)
+	local cam = try(LoGetCameraPosition)
+	if type(cam) ~= "table" or type(cam.x) ~= "table" or type(cam.p) ~= "table" then return nil end
+	local p = me.Position
+	if type(p) ~= "table" then return nil end
+	local dx, dy, dz = (cam.p.x or 0) - p.x, (cam.p.y or 0) - p.y, (cam.p.z or 0) - p.z
+	if dx * dx + dy * dy + dz * dz > 30 * 30 then return nil end    -- (an outside view)
+	local x, y, z = tonumber(cam.x.x), tonumber(cam.x.y), tonumber(cam.x.z)
+	if not (x and y and z) then return nil end
+	local n = math.sqrt(x * x + y * y + z * z)
+	if n < 1e-6 then return nil end
+	return x / n, y / n, z / n
+end
+local function acq_nose(me)
+	local h, p = tonumber(me.Heading) or 0, tonumber(me.Pitch) or 0
+	return math.cos(p) * math.cos(h), math.sin(p), math.cos(p) * math.sin(h)
+end
+local function acq_off(dx, dy, dz, rx, ry, rz)
+	local r = math.sqrt(dx * dx + dy * dy + dz * dz)
+	if r < 1 then return 0, 0 end
+	local h = math.deg(wrap_pi(math.atan2(dz, dx) - math.atan2(rz, rx)))
+	local v = math.deg(math.asin(math.max(-1, math.min(1, dy / r))) - math.asin(math.max(-1, math.min(1, ry))))
+	return h, v
+end
+local function acq_axes0(c)
+	if c.sel_h then LoSetCommand(c.sel_h, 0); LoSetCommand(c.sel_v, 0) end
+end
+local function el_stop(c)
+	if EL.method == 1 and c.axis_v_abs then
+		if EL.kind ~= "position" then LoSetCommand(c.axis_v_abs, 0) end
+	elseif EL.method == 2 and c.sz_stop then LoSetCommand(c.sz_stop) end
+	if EL.probe then
+		if EL.probe.m == 1 and c.axis_v_abs then LoSetCommand(c.axis_v_abs, 0)
+		elseif EL.probe.m == 2 and c.sz_stop then LoSetCommand(c.sz_stop) end
+		EL.probe = nil
+	end
+end
+acq_end = function(c, why)
+	if ACQ.mode then alog(string.format("%s ended: %s (%.1f s, %d lock presses)", ACQ.mode, why, (LoGetModelTime and LoGetModelTime() or 0) - ACQ.t0, ACQ.lock_n)) end
+	ACQ.mode = nil
+	if c then
+		acq_axes0(c)
+		el_stop(c)
+		if (ACQ.lock_up or ACQ.held) and c.lock_up then LoSetCommand(c.lock_up) end
+	end
+	ACQ.lock_up, ACQ.held, ACQ.relock = false, false, false
+end
+-- the scan height: dir 1 up, -1 down, 0 hold. el / cmax: what the radar
+-- reports (scan centre elevation, top of the coverage at the cursor)
+local function el_drive(c, dir, t, el, cmax, still)
+	local function push(m, s)
+		if m == 1 then
+			if not c.axis_v_abs then return end
+			if EL.kind == "position" then
+				EL.v = clamp1(EL.v + s * 0.02)
+				LoSetCommand(c.axis_v_abs, EL.v)
+			else LoSetCommand(c.axis_v_abs, s * 0.6) end
+		elseif m == 2 then
+			if s > 0 and c.sz_up then LoSetCommand(c.sz_up)
+			elseif s < 0 and c.sz_dn then LoSetCommand(c.sz_dn)
+			elseif c.sz_stop then LoSetCommand(c.sz_stop) end
+		end
+	end
+	if EL.method == nil then
+		local p = EL.probe
+		if not p then
+			-- (tried only with the cursor still: the coverage it reports moves with it)
+			if dir == 0 or not still then return end
+			local m = EL.tried[1] and 2 or 1
+			p = {m = m, t = t, el0 = el, c0 = cmax, dir = dir, phase = 1}
+			EL.probe = p
+			alog(string.format("scan height: trying method %d (%s)", m, m == 1 and "Radar Vertical axis" or "Scan Zone keys"))
+		end
+		if p.phase == 1 then
+			push(p.m, p.dir)
+			if t - p.t >= 0.5 then
+				if p.m == 1 then LoSetCommand(c.axis_v_abs, 0) elseif c.sz_stop then LoSetCommand(c.sz_stop) end
+				p.el1, p.c1, p.phase, p.t = el, cmax, 2, t
+			end
+		elseif t - p.t >= 0.4 then
+			local moved = math.abs(p.el1 - p.el0) > math.rad(0.3) or math.abs(p.c1 - p.c0) > math.max(60, 0.04 * math.abs(p.c0))
+			alog(string.format("scan height probe %d: elevation %.2f -> %.2f -> %.2f deg, coverage top %.0f -> %.0f -> %.0f m",
+				p.m, math.deg(p.el0), math.deg(p.el1), math.deg(el), p.c0, p.c1, cmax))
+			if moved then
+				EL.method = p.m
+				local d1 = (math.abs(p.el1 - p.el0) > math.rad(0.3)) and (p.el1 - p.el0) or (p.c1 - p.c0)
+				EL.sign = (d1 * p.dir >= 0) and 1 or -1
+				-- (the axis back at 0 brought the scan back: it sets a position, not a rate)
+				if p.m == 1 then
+					local back = (math.abs(p.el1 - p.el0) > math.rad(0.3)) and (math.abs(el - p.el0) < 0.5 * math.abs(p.el1 - p.el0))
+					EL.kind = back and "position" or "rate"
+				end
+				alog(string.format("scan height: method %d works (%s, sign %d)", p.m, EL.kind or "keys", EL.sign))
+			else
+				EL.tried[p.m] = true
+				if EL.tried[1] and EL.tried[2] then EL.method = 0; alog("scan height: no command moves it from here - the scan stays where it is") end
+			end
+			EL.probe = nil
+		end
+		return
+	end
+	if EL.method == 0 then return end
+	-- (a method that does nothing after all: 4 s of pushing with the cursor
+	-- still and no change - the other one is tried)
+	if dir ~= 0 and still then
+		local w = EL.watch
+		if not w or w.dir ~= dir then EL.watch = {t = t, el = el, c = cmax, dir = dir}
+		elseif t - w.t > 4 then
+			EL.watch = nil
+			if math.abs(el - w.el) < math.rad(0.3) and math.abs(cmax - w.c) < math.max(60, 0.04 * math.abs(w.c)) then
+				alog(string.format("scan height: method %d has no effect - trying another", EL.method))
+				push(EL.method, 0)
+				EL.tried[EL.method] = true
+				EL.method = (EL.tried[1] and EL.tried[2]) and 0 or nil
+				return
+			end
+		end
+	else EL.watch = nil end
+	if dir == 0 then
+		if EL.method == 2 or EL.kind ~= "position" then push(EL.method, 0) end
+	else push(EL.method, dir * EL.sign) end
+end
+local function acq_request(c, req, t)
+	alog("request: " .. req .. "  (radar mode " .. table.concat({acq_master()}, " / ") .. ")")
+	if req == "RTS" then
+		if ACQ.mode then acq_end(c, "return to search") end
+		if acq_locked() and c.reset then LoSetCommand(c.reset) end
+		local m = acq_master()
+		if (m == "VS" or m == "BORE" or m == "FI0" or m == "CAC") and c.m_bvr then LoSetCommand(c.m_bvr) end
+		return
+	end
+	if req == "BST" or req == "VS" then
+		if ACQ.mode then acq_end(c, req == "BST" and "to Boresight" or "to Vertical Scan") end
+		local cmd = (req == "BST") and c.m_bore or c.m_vs
+		if cmd then LoSetCommand(cmd) else alog("no command number for " .. req .. ": run INSTALL.bat again") end
+		return
+	end
+	if not ACQ_DEF[req] then return end
+	-- (v1.1: supersearch stays on the nose - helmet acquisition has the
+	-- auto acq switch forward)
+	if ACQ.mode then acq_end(c, "new request") end
+	ACQ.mode, ACQ.t0, ACQ.bvr_n, ACQ.lock_t, ACQ.lock_n, ACQ.near_n = req, t, 0, nil, 0, 0
+	ACQ.ax, ACQ.st_t, ACQ.radar_said, ACQ.held, ACQ.held_t, ACQ.relock = {}, nil, false, false, nil, false
+	HOLD.q = false                                      -- (the radar has the cursor now)
+	-- the auto acquisition modes start from search: a lock is dropped first
+	if acq_locked() and c.reset then LoSetCommand(c.reset); ACQ.wait = t + 0.4 end
+	ACQ.aim = nil
+	alog("start " .. req .. "  [acq v4]")
+end
+local function acq_tick(t)
+	local c = cm_cmds(t)
+	if ACQ.lock_up and c and c.lock_up then LoSetCommand(c.lock_up); ACQ.lock_up = false end
+	if ACQ.req then
+		local r = ACQ.req
+		ACQ.req = nil
+		if c then acq_request(c, r, t) else alog("no command numbers (Logs\\f15sit_icmd.lua): run INSTALL.bat again") end
+	end
+	if not ACQ.mode or not c or not LoSetCommand then return end
+	if not (c.lock and c.lock_up and c.sel_h and c.zoom_in) then
+		alog("command numbers missing (lock / slew / zoom): run INSTALL.bat again"); acq_end(c, "no commands"); return
+	end
+	if ACQ.wait and t < ACQ.wait and t >= ACQ.t0 then return end
+	ACQ.wait = nil
+	if t - ACQ.t0 > ACQ_MAX_S or t < ACQ.t0 then acq_end(c, "timed out"); return end
+	if acq_locked() then
+		local a, me0 = ACQ.aim, try(LoGetSelfData)
+		local lk = try(LoGetLockedTargetInformation)
+		local o = type(lk) == "table" and lk[1] and lk[1].target
+		if a and o and type(me0) == "table" and type(me0.Position) == "table" then
+			local x, y, z = pos_of(o)
+			if x then
+				local h, v = acq_off(x - me0.Position.x, y - me0.Position.y, z - me0.Position.z, a.rx, a.ry, a.rz)
+				alog(string.format("locked: %s (aimed at %s) - %.1f deg %s, %.1f deg %s of the cue",
+					tostring(o.ID), tostring(a.id), math.abs(h), h < 0 and "left" or "right", math.abs(v), v < 0 and "below" or "above"))
+			end
+		end
+		acq_end(c, "locked"); return
+	end
+	local si = try(LoGetSightingSystemInfo)
+	if type(si) ~= "table" then return end
+	if not si.radar_on then
+		if not ACQ.radar_said then ACQ.radar_said = true; alog("radar is off: waiting") end
+		return
+	end
+	-- 1) the radar in search (BVR)
+	local m = acq_master()
+	if m ~= "BVR" and ACQ.bvr_n < 3 and t - ACQ.bvr_t > 0.7 then
+		ACQ.bvr_n, ACQ.bvr_t = ACQ.bvr_n + 1, t
+		if c.m_bvr then LoSetCommand(c.m_bvr); alog("radar mode " .. m .. ": BVR pressed") end
+		return
+	end
+	local d = ACQ_DEF[ACQ.mode]
+	local me = try(LoGetSelfData)
+	if type(me) ~= "table" or type(me.Position) ~= "table" then return end
+	local ox, oy, oz = me.Position.x, me.Position.y, me.Position.z
+	local hdg = tonumber(me.Heading) or 0
+	-- 2) the range scale: the smallest that holds the mode's range
+	local sc = type(si.scale) == "table" and si.scale or {}
+	local dist, saz = tonumber(sc.distance) or 0, tonumber(sc.azimuth) or 1.0472
+	if dist <= 0 or saz <= 0 then return end
+	local want = ACQ_SCALES[#ACQ_SCALES]
+	for _, s in ipairs(ACQ_SCALES) do if s >= d.rmax - 1 then want = s; break end end
+	if math.abs(dist - want) > 10 and t - ACQ.zoom_t > 0.35 then
+		ACQ.zoom_t = t
+		LoSetCommand(dist > want and c.zoom_in or c.zoom_out)
+		acq_axes0(c)
+		return
+	end
+	-- 3) the circle's centre: the nose, or where the pilot looks (helmet
+	--    acquisition, and LRBST while the helmet is on)
+	local rx, ry, rz = acq_nose(me)
+	local cued = false
+	if ACQ.mode == "HM" or (ACQ.mode == "LR" and OPT.f15c_sit_hmd) then
+		local lx, ly, lz = acq_look(me)
+		if lx then rx, ry, rz, cued = lx, ly, lz, true end
+	end
+	-- 4) the first (nearest) radar contact inside the circle, inside the
+	--    radar's own azimuth limits
+	local cosc = math.cos(d.cone)
+	ACQ.cand = false
+	-- (FC3 lists a radar contact only for a moment when the beam paints it:
+	-- each is remembered for ACQ_MEM_S, moved on with its velocity)
+	local tg = try(LoGetTargetInformation)
+	local mem = ACQ.memo
+	if type(tg) == "table" then
+		for k, o in pairs(tg) do
+			local x, y, z = pos_of(o)
+			if x then
+				local v = type(o.velocity) == "table" and o.velocity or {}
+				mem[o.ID or k] = {t = t, x = x, y = y, z = z, vx = tonumber(v.x) or 0, vy = tonumber(v.y) or 0, vz = tonumber(v.z) or 0}
+			end
+		end
+	end
+	local best
+	for id, o in pairs(mem) do
+		local age = t - o.t
+		if age > ACQ_MEM_S or age < 0 then mem[id] = nil
+		else
+			local x, y, z = o.x + o.vx * age, o.y + o.vy * age, o.z + o.vz * age
+			local dx, dy, dz = x - ox, y - oy, z - oz
+			local r = math.sqrt(dx * dx + dy * dy + dz * dz)
+			if r >= d.rmin and r <= d.rmax and (dx * rx + dy * ry + dz * rz) >= cosc * r then
+				local rel = wrap_pi(math.atan2(dz, dx) - hdg)
+				-- (the score: helmet cued - the angle off the cue's centre,
+				-- else the range)
+				local score = cued and -((dx * rx + dy * ry + dz * rz) / r) or r
+				if math.abs(rel) < saz * 0.98 and (not best or score < best) then
+					best = score
+					ACQ.cand, ACQ.cx, ACQ.cy, ACQ.cz, ACQ.cr, ACQ.cid = true, x, y, z, r, id
+				end
+			end
+		end
+	end
+	-- 5) where the cursor goes: on a contact the radar showed inside the
+	--    circle; else parked on the circle's bearing (SS / helmet at 60 %,
+	--    LRBST at 75 % of the mode's range), the scan height on its line of
+	--    sight there, waiting for the radar to paint something. (Holding the
+	--    lock with nothing under the cursor does not work in FC3: it freezes
+	--    the slew and walks the cursor in towards the jet.)
+	local tx, ty, href
+	if ACQ.cand then
+		local dx, dz = ACQ.cx - ox, ACQ.cz - oz
+		tx = wrap_pi(math.atan2(dz, dx) - hdg) / saz
+		ty = 2 * math.sqrt(dx * dx + dz * dz) / dist - 1
+		href = ACQ.cy
+	else
+		local r0 = (ACQ.mode == "LR" and 0.75 or 0.6) * d.rmax
+		tx = wrap_pi(math.atan2(rz, rx) - hdg) / saz
+		ty = 2 * r0 / dist - 1
+		local hl = math.sqrt(rx * rx + rz * rz)
+		href = oy + r0 * ry / math.max(hl, 0.05)
+	end
+	tx, ty = clamp1(tx), clamp1(ty)
+	local tdc = type(si.TDC) == "table" and si.TDC or {}
+	local cx0, cy0 = tonumber(tdc.x) or 0, tonumber(tdc.y) or 0
+	local ex, ey = tx - cx0, ty - cy0
+	-- 6) the scan height: the contact's (or the line of sight's) altitude
+	--    inside the coverage the radar reports at the cursor's range
+	local sz = type(si.ScanZone) == "table" and si.ScanZone or {}
+	local cov = type(sz.coverage_H) == "table" and sz.coverage_H or {}
+	local cmin, cmax = tonumber(cov.min) or 0, tonumber(cov.max) or 0
+	local el = type(sz.position) == "table" and tonumber(sz.position.elevation) or 0
+	local dir = 0
+	if cmax > cmin and math.abs(ey) < 0.15 then
+		local mg = 0.2 * (cmax - cmin)
+		if href > cmax - mg then dir = 1 elseif cmin > 1 and href < cmin + mg then dir = -1 end
+	end
+	local still = math.abs(ex) < 0.03 and math.abs(ey) < 0.03
+	el_drive(c, dir, t, el, cmax, still)
+	-- (once a second: what it sees and does, for the log)
+	if t - (ACQ.st_t or -10) >= 1 or t < (ACQ.st_t or 0) then
+		ACQ.st_t = t
+		local n = 0
+		for _ in pairs(mem) do n = n + 1 end
+		alog(string.format("%s: cursor %.3f %.3f -> %.3f %.3f | %s | radar contacts %d (remembered) | slew sign %d %d | scan el %.1f deg, coverage %.0f-%.0f m, want %.0f m | lock %s",
+			ACQ.mode, cx0, cy0, tx, ty, ACQ.cand and string.format("contact %.1f NM", ACQ.cr / 1852) or "no contact: waiting on the line of sight",
+			n, ACQ.sx, ACQ.sy, math.deg(el), cmin, cmax, href, ACQ.held and "held" or "-"))
+	end
+	-- (the cursor holds still while a scan height command is tried)
+	if EL.probe then acq_axes0(c); return end
+	-- 7) the cursor: a push towards the place (FC3's slew axis is a rate)
+	local function push(e) local u = clamp1(e * 4); if math.abs(e) > 0.01 and math.abs(u) < 0.12 then u = (e > 0) and 0.12 or -0.12 end; return u end
+	local uh, uv = push(ex), push(ey)
+	-- (each axis's direction is learnt while pushing: turned when the cursor
+	-- runs the wrong way, or does not move at all while it is not at the
+	-- edge it is pushed to - a cursor pinned at the far edge by a wrong
+	-- sign does not move either)
+	local function learn(a, pos, u, lo_name)
+		local w = ACQ.ax[a]
+		if not w or t - w.t >= 0.3 or t < w.t then
+			if w and math.abs(w.u) >= 0.3 then
+				local d = pos - w.p
+				local at_edge = (w.u > 0 and pos >= 0.97) or (w.u < 0 and pos <= -0.97)
+				if d * w.u < -0.02 then
+					ACQ[lo_name] = -ACQ[lo_name]; ACQ.ax[a .. "n"] = 0
+					alog(string.format("cursor: %s slew ran the wrong way - turned", a))
+				elseif math.abs(d) < 0.004 and not at_edge then
+					w.still = (w.still or 0) + (t - w.t)
+					if w.still >= 0.6 then
+						local k = (ACQ.ax[a .. "n"] or 0) + 1
+						ACQ.ax[a .. "n"] = k
+						if k <= 2 then
+							ACQ[lo_name] = -ACQ[lo_name]
+							alog(string.format("cursor: %s slew does not move it (at %.3f) - trying the other way", a, pos))
+						elseif k == 3 then
+							alog(string.format("cursor: %s slew from the export does not move the radar cursor either way (at %.3f)", a, pos))
+						end
+						w.still = 0
+					end
+				else w.still = 0 end
+			end
+			ACQ.ax[a] = {t = t, p = pos, u = u, still = w and w.still or 0}
+		end
+	end
+	learn("horizontal", cx0, uh, "sx")
+	learn("vertical", cy0, uv, "sy")
+	-- 8) the lock, on a contact: pressed and released (again after 0.8 s
+	--    if it did not take - TWS takes two)
+	if ACQ.held then LoSetCommand(c.lock_up); ACQ.held = false end
+	if ACQ.cand and math.abs(ex) < 0.035 and math.abs(ey) < 0.035 then ACQ.near_n = ACQ.near_n + 1 else ACQ.near_n = 0 end
+	if ACQ.near_n >= 2 and (not ACQ.lock_t or t - ACQ.lock_t > 0.8 or t < ACQ.lock_t) then
+		acq_axes0(c)
+		LoSetCommand(c.lock)
+		ACQ.lock_up, ACQ.lock_t, ACQ.lock_n = true, t, ACQ.lock_n + 1
+		local h, v = acq_off(ACQ.cx - ox, ACQ.cy - oy, ACQ.cz - oz, rx, ry, rz)
+		ACQ.aim = {id = ACQ.cid, rx = rx, ry = ry, rz = rz}
+		alog(string.format("lock pressed: contact %s at %.1f NM, %.1f deg %s, %.1f deg %s of the cue, cursor %.3f %.3f", tostring(ACQ.cid),
+			ACQ.cr / 1852, math.abs(h), h < 0 and "left" or "right", math.abs(v), v < 0 and "below" or "above", cx0, cy0))
+		return
+	end
+	LoSetCommand(c.sel_h, uh * ACQ.sx)
+	LoSetCommand(c.sel_v, uv * ACQ.sy)
+end
+
+-----------------------------------------------------------------------
+-- WEAPON SELECT SWITCH / MISSILE REJECT (v1.1). The real throttle switch:
+-- forward GUN, center SRM (AIM-9), aft MRM (AIM-7 / AIM-120); the missile
+-- reject switch steps to the next missile type of the kind selected (e.g.
+-- AIM-120 -> AIM-7). FC3 has only "weapon change" (cycles all weapons) and
+-- "cannon": they are pressed, a step at a time, until the payload's
+-- selected station holds the asked kind. Logged to Logs\f15sit_wpn.log.
+-----------------------------------------------------------------------
+local wlog_n = 0
+local function wlog(msg)
+	if wlog_n >= 300 then return end
+	wlog_n = wlog_n + 1
+	pcall(function()
+		local l = require("lfs")
+		local f = io.open(l.writedir() .. "Logs/f15sit_wpn.log", (wlog_n == 1) and "w" or "a")
+		if f then f:write(os.date("%H:%M:%S ") .. tostring(msg) .. "\n"); f:close() end
+	end)
+end
+local function wpn_class(n)
+	local u = tostring(n or ""):upper():gsub("_", "-")
+	if u:find("AIM%-9") or u:find("R%-73") or u:find("R%-60") or u:find("MAGIC") or u:find("PYTHON") or u:find("SIDEWINDER") then return "SRM" end
+	if u:find("AIM%-7") or u:find("AIM%-120") or u:find("R%-27") or u:find("R%-77") or u:find("SPARROW") or u:find("AMRAAM") then return "MRM" end
+	return nil
+end
+-- the selected station: number, weapon name, kind (station 0: the gun or nothing)
+local function wpn_now()
+	local pl = try(LoGetPayloadInfo)
+	if type(pl) ~= "table" then return 0, "", nil end
+	local cs = tonumber(pl.CurrentStation) or 0
+	local st = cs > 0 and type(pl.Stations) == "table" and pl.Stations[cs]
+	if type(st) == "table" and (tonumber(st.count) or 0) > 0 then
+		local n = store_name(st.weapon)
+		return cs, n, wpn_class(n)
+	end
+	return cs, "", nil
+end
+-- the gun: FC3 keeps the last missile station selected in gun mode, so it
+-- is told by the radar mode (in DCS: "CAC / GUN")
+local function wpn_mode()
+	local nav = try(LoGetNavigationInfo)
+	local sm = type(nav) == "table" and type(nav.SystemMode) == "table" and nav.SystemMode or {}
+	return tostring(sm.master or ""), tostring(sm.submode or "")
+end
+local function wpn_is_gun()
+	local m, sub = wpn_mode()
+	local u = (m .. " " .. sub):upper()
+	return u:find("GUN") ~= nil or u:find("CANNON") ~= nil
+end
+local function wpn_done(why)
+	local cs, n = wpn_now()
+	local m, sub = wpn_mode()
+	wlog(string.format("%s: %s (%d presses; now station %d %s, radar %s / %s, gun %s)", WPN.goal or "?", why, WPN.n, cs, n ~= "" and n or "-", m, sub, tostring(wpn_is_gun())))
+	WPN.goal = nil
+end
+-- target step / unlock (v1.1). The locked list (LoGetLockedTargetInformation):
+-- its IDs in its order (in TWS: every track; which one is primary is
+-- logged to find out). Step: FC3's "next target" (iCommandPlaneChangeTarget)
+-- in TWS. Unlock: in TWS "unlock TWS target" (drops the primary track),
+-- else "return to search" (iCommandSensorReset).
+local function tgt_ids()
+	local lk = try(LoGetLockedTargetInformation)
+	local ids = {}
+	if type(lk) == "table" then
+		for _, e in ipairs(lk) do
+			local o = type(e) == "table" and (type(e.target) == "table" and e.target or e)
+			if o then ids[#ids + 1] = tostring(o.ID) end
+		end
+	end
+	return #ids > 0 and table.concat(ids, " ") or "none"
+end
+-- (v1.1, from the logs: FC3's "next target" steps the steerpoint, and its
+-- "unlock TWS target" alone drops nothing.) So both slew the radar cursor
+-- onto a TWS track - the positions come from the locked list, which follows
+-- the targets: step = the cursor onto the next track to the right of the one
+-- under it (wrapping round; no lock press: in FC3 that goes STT), unlock =
+-- "unlock TWS target" on the track under the cursor. STT: unlock = return
+-- to search.
+local function tgt_tracks(si)
+	local me = try(LoGetSelfData)
+	if type(me) ~= "table" or type(me.Position) ~= "table" then return nil end
+	local sc = type(si.scale) == "table" and si.scale or {}
+	local dist, saz = tonumber(sc.distance) or 0, tonumber(sc.azimuth) or 1.0472
+	if dist <= 0 or saz <= 0 then return nil end
+	local ox, oz, hdg = me.Position.x, me.Position.z, tonumber(me.Heading) or 0
+	local lk = try(LoGetLockedTargetInformation)
+	local out = {}
+	if type(lk) == "table" then
+		for _, e in ipairs(lk) do
+			local o = type(e) == "table" and (type(e.target) == "table" and e.target or e)
+			local x, _, z = nil, nil, nil
+			if o then x, _, z = pos_of(o) end
+			if x then
+				local dx, dz = x - ox, z - oz
+				local tx = wrap_pi(math.atan2(dz, dx) - hdg) / saz
+				local ty = 2 * math.sqrt(dx * dx + dz * dz) / dist - 1
+				out[#out + 1] = {id = o.ID, tx = tx, ty = ty, ok = math.abs(tx) <= 0.98 and ty >= -0.98 and ty <= 0.98}
+			end
+		end
+	end
+	return out
+end
+local function tgt_tick(t, c)
+	local m, sub = wpn_mode()
+	local tws = sub:upper() == "TWS"
+	local si = try(LoGetSightingSystemInfo)
+	if type(si) ~= "table" then wpn_done("no radar data"); return end
+	local tdc = type(si.TDC) == "table" and si.TDC or {}
+	local cx, cy = tonumber(tdc.x) or 0, tonumber(tdc.y) or 0
+	if WPN.n == 0 then
+		if ACQ.mode then wpn_done("auto acquisition running: no step"); return end
+		if not tws then
+			if WPN.goal == "TSTEP" then wpn_done("not in TWS: no step"); return end
+			LoSetCommand(c.reset); WPN.n, WPN.t_next = 1, t + 0.6          -- (STT / search: return to search)
+			WPN.goal = "TDONE"
+			return
+		end
+		local tr = tgt_tracks(si)
+		if not tr or #tr == 0 then wpn_done("no TWS tracks"); return end
+		-- the track under the cursor (nearest to it)
+		local cur, best = nil, nil
+		for _, k in ipairs(tr) do
+			local d = (k.tx - cx) ^ 2 + (k.ty - cy) ^ 2
+			if not best or d < best then best, cur = d, k end
+		end
+		local aim = cur
+		if WPN.goal == "TSTEP" then
+			if #tr < 2 then wpn_done("only one TWS track"); return end
+			table.sort(tr, function(a, b) return a.tx < b.tx end)
+			local i0 = 1
+			for i, k in ipairs(tr) do if k.id == cur.id then i0 = i end end
+			aim = nil
+			for j = 1, #tr - 1 do
+				local k = tr[(i0 - 1 + j) % #tr + 1]
+				if k.ok then aim = k; break end
+			end
+			if not aim then wpn_done("no other track inside the radar scale"); return end
+		elseif not aim.ok then wpn_done("track outside the radar scale"); return end
+		WPN.aim, WPN.t0, WPN.near, WPN.n, WPN.t_next = aim.id, t, 0, 1, t
+		wlog(string.format("%s: cursor %.3f %.3f -> track %s at %.3f %.3f", WPN.goal, cx, cy, tostring(aim.id), aim.tx, aim.ty))
+		return
+	end
+	if WPN.goal == "TDONE" then wpn_done("pressed; locks now " .. tgt_ids()); return end
+	if WPN.goal == "TPRESSED" then
+		if WPN.lock_up then LoSetCommand(c.lock_up); WPN.lock_up = false end
+		if t < WPN.t_next and t >= WPN.t_next - 2 then return end
+		wpn_done("on track " .. tostring(WPN.aim) .. "; locks now " .. tgt_ids() .. ", radar " .. m .. " / " .. sub)
+		return
+	end
+	-- slew onto the aimed track (it moves: its place again every frame)
+	local tr = tgt_tracks(si) or {}
+	local aim
+	for _, k in ipairs(tr) do if k.id == WPN.aim then aim = k end end
+	if not aim or not tws then acq_axes0(c); wpn_done("the track went away"); return end
+	if t - WPN.t0 > 4 or t < WPN.t0 then acq_axes0(c); wpn_done(string.format("cursor did not get there (%.3f %.3f)", cx, cy)); return end
+	local ex, ey = aim.tx - cx, aim.ty - cy
+	if math.abs(ex) < 0.03 and math.abs(ey) < 0.03 then WPN.near = WPN.near + 1 else WPN.near = 0 end
+	if WPN.near >= 2 then
+		acq_axes0(c)
+		-- (step: the cursor only - a lock press on a TWS track goes STT in FC3,
+		-- it does not make the track primary; the pilot locks it if wanted)
+		if WPN.goal == "TUNLOCK" then LoSetCommand(c.tws_drop) end
+		WPN.goal, WPN.t_next = "TPRESSED", t + 0.6
+		return
+	end
+	local function push(e) local u = clamp1(e * 4); if math.abs(e) > 0.01 and math.abs(u) < 0.12 then u = (e > 0) and 0.12 or -0.12 end; return u end
+	LoSetCommand(c.sel_h, push(ex) * ACQ.sx)
+	LoSetCommand(c.sel_v, push(ey) * ACQ.sy)
+	WPN.t_next = t
+end
+local function wpn_tick(t)
+	local c = cm_cmds(t)
+	if WPN.req then
+		local r = WPN.req
+		WPN.req = nil
+		if r == "TSTEP" or r == "TUNLOCK" then
+			if not (c and c.tws_drop and c.reset and c.lock and c.sel_h) then wlog("command numbers missing (target step / unlock): run INSTALL.bat again"); return end
+			WPN.goal, WPN.n, WPN.t_next = r, 0, t
+			local m, sub = wpn_mode()
+			wlog(string.format("request %s: radar %s / %s, locks %s", r, m, sub, tgt_ids()))
+			return
+		end
+		if not (c and c.chg_wpn and c.cannon) then wlog("command numbers missing (weapon change / cannon): run INSTALL.bat again"); return end
+		local cs, n, k = wpn_now()
+		WPN.goal, WPN.n, WPN.t_next, WPN.from, WPN.kind0, WPN.gun_t, WPN.away = r, 0, t, n, k, nil, false
+		local m, sub = wpn_mode()
+		wlog(string.format("request %s: now station %d %s (%s), radar %s / %s, gun %s", r, cs, n ~= "" and n or "-", k or "-", m, sub, tostring(wpn_is_gun())))
+		if r == "REJ" and not k then wpn_done("no missile selected"); return end
+	end
+	if not WPN.goal or not c or not LoSetCommand then return end
+	if WPN.goal == "TSTEP" or WPN.goal == "TUNLOCK" or WPN.goal == "TDONE" or WPN.goal == "TPRESSED" then tgt_tick(t, c); return end
+	if t < WPN.t_next and t >= WPN.t_next - 2 then return end
+	local cs, n, k = wpn_now()
+	local g = WPN.goal
+	if g == "GUN" then
+		-- one press of the cannon key (it toggles: never a second one)
+		if WPN.n == 0 then
+			if wpn_is_gun() then wpn_done("already on the gun"); return end
+			LoSetCommand(c.cannon); WPN.gun_on = true; WPN.n = 1; WPN.t_next = t + 0.6
+			return
+		end
+		wpn_done("cannon pressed")
+		return
+	end
+	if g == "SRM" or g == "MRM" then
+		if k == g and not (WPN.n == 0 and wpn_is_gun()) then wpn_done(n .. " selected"); return end
+		if WPN.n >= 10 then wpn_done("none on board"); return end
+		-- (on the gun: the cannon key takes it off first)
+		if WPN.n == 0 and wpn_is_gun() then
+			LoSetCommand(c.cannon); WPN.gun_on = false; WPN.n = 1; WPN.t_next = t + 0.5
+			return
+		end
+		if k == g then wpn_done(n .. " selected"); return end
+		LoSetCommand(c.chg_wpn); WPN.gun_on = false; WPN.n = WPN.n + 1; WPN.t_next = t + 0.35
+		return
+	end
+	if g == "REJ" then
+		if k == WPN.kind0 and n ~= WPN.from and n ~= "" then wpn_done("rejected " .. WPN.from .. " -> " .. n); return end
+		if n ~= WPN.from then WPN.away = true
+		elseif WPN.away then wpn_done("no other " .. tostring(WPN.kind0) .. " on board: back on " .. n); return end
+		if WPN.n >= 12 then wpn_done("gave up"); return end
+		LoSetCommand(c.chg_wpn); WPN.gun_on = false; WPN.n = WPN.n + 1; WPN.t_next = t + 0.35
+		return
+	end
+	wpn_done("unknown request")
+end
+
 -- the radar cursor in its own small packet "F15SITC", 20 times a
 -- second while it moves (and twice a second anyway): the SIT page's
 -- capture window and EXP follow the VSD cursor smoothly.
@@ -1324,9 +2029,11 @@ local function cursor_tick(t)
 	local tdc = type(si.TDC) == "table" and si.TDC or {}
 	local sn = try(LoGetSnares)
 	sn = type(sn) == "table" and sn or {}
-	local line = string.format("F15SITC,%d,%.4f,%.4f,%.0f,%.4f,%.4f,%.4f,%d,%d", si.radar_on and 1 or 0,
+	-- (field 10: the auto acquisition running, 0 none, 1 SS, 2 LR, 3 helmet)
+	local line = string.format("F15SITC,%d,%.4f,%.4f,%.0f,%.4f,%.4f,%.4f,%d,%d,%d", si.radar_on and 1 or 0,
 		tonumber(tdc.x) or 0, tonumber(tdc.y) or 0, tonumber(sc.distance) or 0, tonumber(sc.azimuth) or 0,
-		tonumber(pos.azimuth) or 0, tonumber(size.azimuth) or 0, tonumber(sn.chaff) or 0, tonumber(sn.flare) or 0)
+		tonumber(pos.azimuth) or 0, tonumber(size.azimuth) or 0, tonumber(sn.chaff) or 0, tonumber(sn.flare) or 0,
+		ACQ.mode and ACQ_DEF[ACQ.mode].code or 0)
 	if line ~= last_cur_line or t - last_cur_send >= 0.5 then
 		local u = get_udp()
 		if not u then return end
@@ -1368,6 +2075,7 @@ local function msl_lock()
 	local lk = try(LoGetLockedTargetInformation)
 	if type(lk) ~= "table" then return nil end
 	for _, tg in pairs(lk) do
+		tg = type(tg) == "table" and type(tg.target) == "table" and tg.target or tg
 		local x, _, z = pos_of(tg)
 		if x then
 			local v = type(tg.velocity) == "table" and tg.velocity or {}
@@ -1406,7 +2114,7 @@ local function msl_tick(t)
 	for _, typ in ipairs(fired) do
 		local tg = lk and {x = lk.x, z = lk.z, vx = lk.vx, vz = lk.vz, t = t} or nil
 		local r0 = tg and math.sqrt((tg.x - ox) ^ 2 + (tg.z - oz) ^ 2) or nil
-		table.insert(MSL.list, {t0 = t, typ = typ, tg = tg, mx = ox, mz = oz,
+		table.insert(MSL.list, {t0 = t, typ = typ, tg = tg, mx = ox, mz = oz, lx = ox, lz = oz,
 			tti = r0 and r0 / (MSL_V[typ] or 800) or nil, est = true})
 		dbg(string.format("missile away: %s, target %s", typ, r0 and string.format("%.0f m", r0) or "none"))
 	end
@@ -1499,13 +2207,26 @@ local function msl_tick(t)
 			end
 		end
 		if m.est and m.tti then m.tti = math.max(0, m.tti - dt) end
+		-- (v1.1) not followed as a world object (datalink off, a server
+		-- that hides weapons): its place estimated from the launch point
+		-- towards the target at the average speed
+		local est_pos = false
+		if not (m.id and not m.lost and m.px) and tx then
+			local dx, dz = tx - m.lx, tz - m.lz
+			local d0 = math.sqrt(dx * dx + dz * dz)
+			if d0 > 1 then
+				local go = math.min((MSL_V[m.typ] or 800) * (t - m.t0), d0)
+				m.mx, m.mz = m.lx + dx / d0 * go, m.lz + dz / d0 * go
+				est_pos = true
+			end
+		end
 		if m.tti and m.tti <= 0 and m.est and t - m.t0 > 2 then
 			if t - (m.zero or t) > 3 then alive = false end
 			m.zero = m.zero or t
 		end
 		if alive then
 			keep[#keep + 1] = m
-			out[#out + 1] = string.format("%s,%d,%.0f,%.0f,%d,%.0f,%.0f,%.1f", m.typ, m.id and not m.lost and 1 or 0, m.mx or 0, m.mz or 0,
+			out[#out + 1] = string.format("%s,%d,%.0f,%.0f,%d,%.0f,%.0f,%.1f", m.typ, ((m.id and not m.lost) or est_pos) and 1 or 0, m.mx or 0, m.mz or 0,
 				tx and 1 or 0, tx or 0, tz or 0, m.tti or -1)
 		end
 	end
@@ -1654,6 +2375,29 @@ local function ours(t)
 	end
 	return OURS.v
 end
+-- JHMCS: where the pilot looks. The view's forward and up directions (world,
+-- x north, y up, z east) go to the helmet device every frame as commands
+-- 6201-6203 (forward) and 6204-6206 (up), value = the component (-1..1),
+-- sent when the view moved. 6206 comes last: the device takes the set then.
+local LOOK = {fx = nil, fy = nil, fz = nil, ux = nil, uy = nil, uz = nil}
+local function look_tick()
+	local cam = LoGetCameraPosition and LoGetCameraPosition()
+	if type(cam) ~= "table" or type(cam.x) ~= "table" or type(cam.y) ~= "table" or not LoSetCommand then return end
+	local fx, fy, fz = tonumber(cam.x.x), tonumber(cam.x.y), tonumber(cam.x.z)
+	local ux, uy, uz = tonumber(cam.y.x), tonumber(cam.y.y), tonumber(cam.y.z)
+	if not (fx and fy and fz and ux and uy and uz) then return end
+	-- (sent when the view moved, and 5 times a second while it holds still:
+	-- the helmet takes a silent view as lost)
+	local t = os.clock()
+	if fx ~= LOOK.fx or fy ~= LOOK.fy or fz ~= LOOK.fz or ux ~= LOOK.ux or uy ~= LOOK.uy or uz ~= LOOK.uz
+		or t - (LOOK.t or -1) >= 0.2 or t < (LOOK.t or 0) then
+		LOOK.fx, LOOK.fy, LOOK.fz, LOOK.ux, LOOK.uy, LOOK.uz, LOOK.t = fx, fy, fz, ux, uy, uz, t
+		-- (6207 first: the model time of this view, for the helmet's prediction)
+		if LoGetModelTime then LoSetCommand(6207, LoGetModelTime()) end
+		LoSetCommand(6201, fx); LoSetCommand(6202, fy); LoSetCommand(6203, fz)
+		LoSetCommand(6204, ux); LoSetCommand(6205, uy); LoSetCommand(6206, uz)
+	end
+end
 local function our_after()
 	if RUN.stopped or F15SIT_GEN ~= RUN.gen then return end
 	if not OPT.f15c_sit_enabled then return end      -- Options > Special: add-on off
@@ -1679,9 +2423,21 @@ local function our_after()
 		local ok3, err3 = pcall(cursor_tick, t)
 		if not ok3 then dbg("cursor error: " .. tostring(err3)) end
 	end
+	if mine or ACQ.mode or ACQ.req then
+		local ok8, err8 = pcall(acq_tick, t)
+		if not ok8 then alog("error: " .. tostring(err8)); pcall(acq_end, cm_cmds(t), "error") end
+	end
+	if WPN.req or WPN.goal then
+		local ok9, err9 = pcall(wpn_tick, t)
+		if not ok9 then wlog("error: " .. tostring(err9)); WPN.goal = nil end
+	end
 	if mine then
 		local ok6, err6 = pcall(msl_tick, t)
 		if not ok6 then dbg("missile error: " .. tostring(err6)) end
+	end
+	if mine and OPT.f15c_sit_hmd then
+		local ok7, err7 = pcall(look_tick)
+		if not ok7 then dbg("look error: " .. tostring(err7)) end
 	end
 	if PERF.on then perf_add("others", pc, pm); perf_frame() end
 end
@@ -1805,7 +2561,7 @@ do
 		read_options()
 		perf_read_setting()
 		if PERF.on then dbg("perf_log on: timing in Logs/f15sit_export_perf.log") end
-		dbg("LuaExportStart: options on=" .. tostring(OPT.f15c_sit_enabled) .. " datalink=" .. tostring(OPT.f15c_sit_datalink) .. " rwr=" .. tostring(OPT.f15c_sit_rwr))
+		dbg("LuaExportStart: options on=" .. tostring(OPT.f15c_sit_enabled) .. " datalink=" .. tostring(OPT.f15c_sit_datalink) .. " rwr=" .. tostring(OPT.f15c_sit_rwr) .. " hmd=" .. tostring(OPT.f15c_sit_hmd))
 	end
 	local function our_stop()
 		if F15SIT_GEN ~= RUN.gen then return end

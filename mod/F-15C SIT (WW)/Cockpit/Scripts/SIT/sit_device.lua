@@ -14,6 +14,8 @@
 dofile(LockOn_Options.script_path .. "devices.lua")
 dofile(LockOn_Options.script_path .. "command_defs.lua")
 dofile(LockOn_Options.script_path .. "SIT/sit_config.lua")
+dofile(LockOn_Options.script_path .. "HMD/hmd_config.lua")
+pcall(dofile, LockOn_Options.script_path .. "HMD/hmd_options.lua")   -- (HMD.ENABLED: Options > Special)
 dofile(LockOn_Options.script_path .. "SIT/sit_dtm.lua")
 
 local dev = GetSelf()
@@ -73,7 +75,7 @@ local H = {
 	dl = P("DL"), rte = P("RTE"), thr = P("THR"),
 	time = PT("TIME"), status = PT("STATUS"), stpt = PT("STPT_TXT"),
 	rot = P("ROT"), own_rot = P("OWN_ROT"),
-	st_vis = P("ST_VIS"), st_a = P("ST_A"), st_m = P("ST_M"), st_s = P("ST_S"), st_g = P("ST_G"),
+	st_vis = P("ST_VIS"), inv = {PT("INV1_TXT"), PT("INV2_TXT"), PT("INV3_TXT"), PT("INV4_TXT")}, inv_sel = P("INV_SEL"),
 	chaff = P("CHAFF"), flare = P("FLARE"), master = PT("MASTER_TXT"),
 	be = {x = P("BE_X"), y = P("BE_Y"), vis = P("BE_VIS"), on = P("BE_ON"), txt = PT("BE_TXT")},
 	az = {},
@@ -120,7 +122,7 @@ H.cm = {}; for k = 1, 6 do H.cm[k] = PT("CM" .. k .. "_TXT") end
 H.msl = {}
 for k = 1, SIT.MAX_MSL do
 	local p = "MSL" .. k .. "_"
-	H.msl[k] = {x = P(p .. "X"), y = P(p .. "Y"), vis = P(p .. "VIS"), tx = P(p .. "TX"), ty = P(p .. "TY"), tvis = P(p .. "TVIS"),
+	H.msl[k] = {x = P(p .. "X"), y = P(p .. "Y"), vis = P(p .. "VIS"), sym = P(p .. "SYM"), tx = P(p .. "TX"), ty = P(p .. "TY"), tvis = P(p .. "TVIS"),
 		txt = PT(p .. "TXT"), l = {ax = P(p .. "LAX"), ay = P(p .. "LAY"), bx = P(p .. "LBX"), by = P(p .. "LBY"), vis = P(p .. "LVIS")}}
 end
 H.mk = {}
@@ -129,6 +131,7 @@ for k = 1, SIT.MAX_MARKS do
 	H.mk[k] = {x = P(p .. "X"), y = P(p .. "Y"), vis = P(p .. "VIS"), txt = PT(p .. "TXT")}
 end
 H.dcl_lv = PT("DCL_TXT"); H.dcl_pop = P("DCL_POP")
+H.jpwr = P("JPWR")                           -- jet power 1/0, for the helmet device
 H.boot = P("BOOT"); H.dim = P("DIM")          -- start-up screen phase, brightness cover (0..19)
 H.rad = {{}, {}}; H.rad_act = {}; H.rad_cur = {}
 for r = 1, 2 do
@@ -444,6 +447,7 @@ local function parse(data)
 			local c = feed.cur or {}
 			c.on, c.tx, c.ty, c.dist, c.saz, c.az, c.size = f[1] == 1, f[2], f[3], f[4], f[5], f[6], f[7]
 			c.chaff, c.flare, c.t = f[8], f[9], now()
+			c.acq = f[10] or 0               -- (auto acquisition: 0 none, 1 SS, 2 LR, 3 helmet)
 			feed.cur = c
 		end
 		return
@@ -473,7 +477,7 @@ local function parse(data)
 	if data:sub(1, 8) ~= "F15SIT 1" then return end
 	local t = now()
 	local list, wpts, thr, lock, active, status = {}, {}, {}, nil, 0, 0
-	local stores, cm, master = nil, nil, ""
+	local stores, cm, master, gun = nil, nil, "", false
 	local own, fail, flight, sta, cur_sta = feed.own, {}, {}, {}, feed.cur_sta
 	local coal = feed.coal
 	local radar = nil
@@ -493,7 +497,9 @@ local function parse(data)
 		elseif k == "S" then
 			status = f[1] or 0
 		elseif k == "L" and #f >= 5 then
-			lock = {x = f[1], z = f[2], y = f[3], vx = f[4], vz = f[5], t = t}
+			-- (+ the launch envelope, metres: Raero, Rmin, Rpi, Rtr; 0 = none)
+			lock = {x = f[1], z = f[2], y = f[3], vx = f[4], vz = f[5], t = t,
+			        ra = f[6] or 0, rm = f[7] or 0, rp = f[8] or 0, rt = f[9] or 0}
 		elseif k == "R" and #f >= 4 then
 			-- R,on,scan centre az (rad),scan width (rad),range scale (m)[,TDC x,TDC y]
 			radar = {on = f[1] == 1, az = f[2], size = f[3], dist = f[4], tx = f[5] or 0, ty = f[6] or 0,
@@ -501,8 +507,9 @@ local function parse(data)
 		elseif k == "O" then
 			coal = f[1] or coal
 		elseif k == "N" then
-			local m = line:match("^N,([%w_]*)")
+			local m, sub = line:match("^N,([%w_]*),?([%w_]*)")
 			master = MASTER[(m or ""):upper()] or ""
+			gun = (sub or ""):upper():find("GUN") ~= nil
 		elseif k == "Y" and #f >= 2 then
 			-- Y,station,count,CLSID,name
 			stores = stores or {a = 0, m = 0, s = 0}
@@ -529,11 +536,13 @@ local function parse(data)
 			end
 		elseif k == "G" then
 			local lbl, gx, gz, gr = line:match("^G,([^,]*),([^,]*),([^,]*),([^,]*)")
-			if lbl and tonumber(gx) then thr[#thr + 1] = {lbl = lbl, x = tonumber(gx), z = tonumber(gz), ring = tonumber(gr) or 0} end
+			local gy = line:match("^G,[^,]*,[^,]*,[^,]*,[^,]*,([^,]*)")
+			if lbl and tonumber(gx) then thr[#thr + 1] = {lbl = lbl, x = tonumber(gx), z = tonumber(gz), ring = tonumber(gr) or 0,
+				y = tonumber(gy) or 0} end
 		end
 	end
 	feed.list, feed.wpts, feed.thr, feed.lock, feed.active, feed.status = list, wpts, thr, lock, active, status
-	feed.coal, feed.master, feed.radar = coal, master, radar
+	feed.coal, feed.master, feed.radar, feed.gun = coal, master, radar, gun
 	if stores then stores.gun = cm and cm.gun or 0 end
 	feed.stores, feed.cm = stores, cm
 	feed.own, feed.fail, feed.flight, feed.sta, feed.cur_sta = own, fail, flight, sta, cur_sta
@@ -886,8 +895,156 @@ local function slew_command(command, value)
 	return true
 end
 
+-- JHMCS controls: the panel on the left console (power switch, brightness
+-- knob: clickable, their model arguments 131 / 130) and the binds. The
+-- helmet device reads them as F15SIT_HPWR (1 on), HBRT (0..1), HMUTE (1 =
+-- symbology off).
+local HCTL = {pwr = HMD.PWR_START ~= false, brt = HMD.BRT_START or 1, mute = false, args_t = nil}
+local HCP = {pwr = P("HPWR"), brt = P("HBRT"), mute = P("HMUTE")}
+-- the switch and the knob in the model follow binds too (clicks move them themselves)
+local function hmd_args()
+	pcall(function()
+		local mp = GetDevice(0)
+		if mp then
+			mp:set_argument_value(HMD_ARG.PWR, HCTL.pwr and 1 or 0)
+			mp:set_argument_value(HMD_ARG.BRT, HCTL.brt)
+		end
+	end)
+end
+local function hmd_controls(command, value)
+	local on = (value or 0) > 0
+	if command == HMD_PANEL.PWR or command == HMD_PANEL.BRT then
+		-- a click: the model's own argument holds the new position (the
+		-- command's value may be the position or the step)
+		local ok, v = pcall(function() local mp = GetDevice(0); return mp and mp:get_argument_value(command == HMD_PANEL.PWR and HMD_ARG.PWR or HMD_ARG.BRT) end)
+		v = (ok and tonumber(v)) or value or 0
+		if HCTL.starting then v = value or 0 end      -- (the start positions: the click's own value)
+		if command == HMD_PANEL.PWR then HCTL.pwr = v > 0.5 else HCTL.brt = math.min(1, math.max(0, v)) end
+		if log_n < 25 then log(string.format("HMD panel: %s %.2f (command value %s)", command == HMD_PANEL.PWR and "power" or "brightness", v, tostring(value))) end
+	elseif command == HMD_BIND.PWR then
+		if on then HCTL.pwr = not HCTL.pwr; hmd_args() end
+	elseif command == HMD_BIND.BRT_UP then
+		if on then HCTL.brt = math.min(1, HCTL.brt + 0.1); hmd_args() end
+	elseif command == HMD_BIND.BRT_DN then
+		if on then HCTL.brt = math.max(0, HCTL.brt - 0.1); hmd_args() end
+	elseif command == HMD_BIND.SYM_TOGGLE then
+		if on then HCTL.mute = not HCTL.mute end
+	else
+		return false
+	end
+	return true
+end
+local function hmd_controls_tick(t)
+	-- the model's switch and knob to the start positions (ON, full): 1 s
+	-- into the flight, "clicked" as the pilot would (DCS moves the parts; the
+	-- clicks come back here as commands and set the same state)
+	if t > 0 and not HCTL.args_t then HCTL.args_t = t end
+	if HCTL.args_t and not HCTL.args_done and t - HCTL.args_t >= 1 then
+		HCTL.args_done = true
+		HCTL.starting = true
+		local ok, err = pcall(function()
+			dev:performClickableAction(HMD_PANEL.PWR, HCTL.pwr and 1 or 0)
+			dev:performClickableAction(HMD_PANEL.BRT, HCTL.brt)
+		end)
+		HCTL.starting = false
+		hmd_args()
+		log("HMD panel: start positions " .. (ok and "set" or ("not set: " .. tostring(err))))
+	end
+	HCP.pwr:set(HCTL.pwr and 1 or 0); HCP.brt:set(HCTL.brt); HCP.mute:set(HCTL.mute and 1 or 0)
+end
+hmd_controls_tick(0)
+
+-- auto acq switch (v1.1), after the real F-15C:
+--   forward short   Supersearch (from Supersearch: Boresight); looking off
+--                   the nose: helmet acquisition
+--   forward held 1 s Long Range Boresight (while still held)
+--   aft             Vertical Scan
+--   depress         return to search
+-- and the helmet acquisition bind. The export does the work (F15SITA).
+local AQ = {fwd_t = nil, fwd_long = false}
+local HACQ_P = get_param_handle("F15SIT_HACQ")
+local function acq_send(what)
+	-- the radar takes the cursor back from the SIT page
+	if ST.soi_sit then
+		ST.soi_sit = false
+		if SIT.SQUELCH_RADAR then to_export("F15SITQ,0,0,0") end
+	end
+	to_export("F15SITA," .. what)
+	if log_n < 200 then log("auto acq: " .. what) end
+end
+-- the helmet usable: on in Options > Special and its panel power on
+local HPWR_P = get_param_handle("F15SIT_HPWR")
+local function helmet_on()
+	if type(HMD) == "table" and HMD.ENABLED == false then return false end
+	return (HPWR_P:get() or 0) >= 0.5
+end
+local function acq_bind(command, value)
+	if command ~= ACQ_BIND.FWD and command ~= ACQ_BIND.AFT and command ~= ACQ_BIND.DEP and command ~= ACQ_BIND.HACQ
+		and command ~= ACQ_BIND.SSB and command ~= ACQ_BIND.BST then return false end
+	if not PWR.on then return true end
+	local down = (value or 0) > 0
+	if command == ACQ_BIND.FWD then
+		if down then
+			if not AQ.fwd_t then AQ.fwd_t, AQ.fwd_long = now(), false end
+		elseif AQ.fwd_t then
+			-- (v1.1: forward short = helmet acquisition; without the helmet,
+			-- FC3's boresight)
+			if not AQ.fwd_long then acq_send(helmet_on() and "HM" or "BST") end
+			AQ.fwd_t = nil
+		end
+	elseif command == ACQ_BIND.SSB or command == ACQ_BIND.BST then
+		-- (v1.1: own switches) supersearch on the nose; FC3's boresight
+		if down then acq_send(command == ACQ_BIND.SSB and "SS" or "BST") end
+	elseif down then
+		acq_send((command == ACQ_BIND.AFT) and "VS" or (command == ACQ_BIND.DEP) and "RTS" or "HM")
+	end
+	return true
+end
+local CD = {t = nil, long = false}      -- castle down held: since when, long press done
+local function acq_tick(t)
+	-- castle down held 1 s: one declutter step (the release then does nothing)
+	if CD.t and not CD.long and now() - CD.t >= (SIT.CASTLE_LONG_S or 1.0) then
+		CD.long = true
+		if PWR.on and PWR.shown then hotas(SIT_HOTAS.DCLT) end
+	end
+	if CD.t and now() - CD.t > 10 then CD.t = nil end
+	-- the long press: on its own once held long enough (no need to let go)
+	if AQ.fwd_t and not AQ.fwd_long and now() - AQ.fwd_t >= (SIT.AACQ_LONG_S or 1.0) then
+		AQ.fwd_long = true
+		acq_send("LR")
+	end
+	-- (a stuck press, e.g. a lost release: forgotten after 10 s)
+	if AQ.fwd_t and now() - AQ.fwd_t > 10 then AQ.fwd_t = nil end
+	local c = feed.cur
+	HACQ_P:set((c and now() - c.t < 1) and (c.acq or 0) or 0)
+end
+
+-- weapon select switch / missile reject: the export picks the weapon
+-- (FC3 has only "weapon change" and "cannon": it presses them until the
+-- asked kind is selected)
+local WPN_NAME = {}
+for k, v in pairs(WPN_BIND) do WPN_NAME[v] = k end
+for k, v in pairs(TGT_BIND) do WPN_NAME[v] = "T" .. k end      -- (target step / unlock: same path)
+local function wpn_bind(command, value)
+	local what = WPN_NAME[command]
+	if not what then return false end
+	if PWR.on and (value or 0) > 0 then
+		-- (target step / unlock slew the radar cursor: the radar takes it back first)
+		if what:sub(1, 1) == "T" and ST.soi_sit then
+			ST.soi_sit = false
+			if SIT.SQUELCH_RADAR then to_export("F15SITQ,0,0,0") end
+		end
+		to_export("F15SITV," .. what)
+		if log_n < 200 then log("weapon switch: " .. what) end
+	end
+	return true
+end
+
 function SetCommand(command, value)
 	PGF.now = true
+	if hmd_controls(command, value) then return end
+	if acq_bind(command, value) then return end
+	if wpn_bind(command, value) then return end
 	-- binds come in as 6101-6115 (HOTAS) and 6121-6140 (display buttons):
 	-- the F-15C does not pass 3xxx through from the controls; clicks still are 30xx
 	if command >= 6101 and command <= 6120 or command == 6141 or command == 6142 then command = command - 3000
@@ -918,6 +1075,16 @@ function SetCommand(command, value)
 		local page_fn = command == HS.CASTLE_UP or command == HS.CASTLE_DOWN or command == HS.CASTLE_LEFT or
 			command == HS.CASTLE_RIGHT or command == HS.DCLT or command == HS.RNG_UP or command == HS.RNG_DN or
 			command == HS.MARK or command == HS.MARK_DEL
+		-- castle down: short = formation, held 1 s = declutter step (acq_tick)
+		if command == HS.CASTLE_DOWN then
+			if (value or 0) > 0 then
+				if not CD.t then CD.t, CD.long = now(), false end
+			elseif CD.t then
+				if not CD.long and PWR.shown then hotas(command) end
+				CD.t = nil
+			end
+			return
+		end
 		if (value or 0) > 0 and (PWR.shown or not page_fn) then hotas(command) end
 		return
 	end
@@ -1114,7 +1281,8 @@ local function draw_lock(t, stale)
 	-- line from the ownship to the primary designated target
 	local ax, ay, bx, by = clip(0, 0, sx, sy)
 	if ax then
-		H.pdt.vis:set(1); H.pdt.ax:set(ax); H.pdt.ay:set(ay); H.pdt.bx:set(bx); H.pdt.by:set(by)
+		-- (flashes with the fly-out line while a missile is in flight)
+		H.pdt.vis:set((G.msl_fly and not G.msl_flash) and 0 or 1); H.pdt.ax:set(ax); H.pdt.ay:set(ay); H.pdt.bx:set(bx); H.pdt.by:set(by)
 	else
 		H.pdt.vis:set(0)
 	end
@@ -1283,11 +1451,41 @@ local function draw_bull()
 	H.be.txt:set(string.format("%03d-%d", brg, floor(r / NM + 0.5)))
 end
 
+local INV_CL, INV_LETTER = {"a", "s", "m"}, {"A", "M", "S"}
 local function draw_stores(stale)
 	local s, cm = feed.stores, feed.cm
 	if stale or not s or not cm then H.st_vis:set(0); H.master:set(""); return end
 	H.st_vis:set(1)
-	H.st_a:set(s.a); H.st_m:set(s.m); H.st_s:set(s.s); H.st_g:set(cm.gun or 0)
+	-- weapon inventory (v1.1): A AIM-120, M AIM-7, S AIM-9 - count + model
+	-- letter of the selected one, else of the first loaded ("-": none
+	-- left); G = gun rounds / 100. The selected one boxed.
+	local cur = feed.sta and feed.sta[feed.cur_sta or 0]
+	local cur_cl = cur and cur.n > 0 and store_class(cur.name)
+	local sel = 0
+	for k, cl in ipairs(INV_CL) do
+		local n = s[cl] or 0
+		local model = "-"
+		if n > 0 then
+			local nm = (cur_cl == cl) and cur.name or nil
+			if not nm then
+				for _, st in pairs(feed.sta or {}) do
+					if st.n > 0 and store_class(st.name) == cl then nm = st.name; break end
+				end
+			end
+			-- (what follows the number: AIM-120C -> C, AIM-7MH -> MH, AIM-9X -> X;
+			-- at most 2 characters, else the last letter)
+			local u = tostring(nm or ""):upper()
+			local suf = u:match("AIM[%-_ ]?%d+%-?([%a%d]+)")
+			model = (suf and suf ~= "" and suf:sub(1, 2)) or u:match("(%a)[^%a]*$") or "-"
+		end
+		local txt = INV_LETTER[k] .. n .. model
+		H.inv[k]:set(txt)
+		if not feed.gun and cur_cl == cl then sel = k * 10 + math.min(5, math.max(2, #txt)) end
+	end
+	local g = "G" .. floor((cm.gun or 0) / 100)
+	H.inv[4]:set(g)
+	if feed.gun then sel = 40 + math.min(4, math.max(2, #g)) end
+	H.inv_sel:set(sel)
 	H.chaff:set(cm.chaff or 0); H.flare:set(cm.flare or 0)
 	H.master:set(safe_text(feed.master))
 end
@@ -1841,7 +2039,7 @@ init_texts()        -- at load already, before the first frame
 
 function post_initialize()
 	init_texts()
-	log("=== F-15C SIT 1.0, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
+	log("=== F-15C SIT 1.1, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
 	for name, cmd in pairs(SIT_CMD) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_HOTAS) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_PANEL) do dev:listen_command(cmd) end
@@ -1849,6 +2047,11 @@ function post_initialize()
 	for cmd = 6101, 6120 do dev:listen_command(cmd) end
 	dev:listen_command(6141); dev:listen_command(6142)   -- mark / delete mark   -- bound HOTAS (see SetCommand)
 	for cmd = 6121, 6140 do dev:listen_command(cmd) end   -- bound display buttons
+	for _, cmd in pairs(HMD_PANEL) do dev:listen_command(cmd) end   -- JHMCS knob (clicks)
+	for _, cmd in pairs(HMD_BIND) do dev:listen_command(cmd) end    -- JHMCS binds
+	for _, cmd in pairs(ACQ_BIND) do dev:listen_command(cmd) end    -- auto acq switch, helmet acquisition
+	for _, cmd in pairs(WPN_BIND) do dev:listen_command(cmd) end    -- weapon select switch, missile reject
+	for _, cmd in pairs(TGT_BIND) do dev:listen_command(cmd) end    -- target step, unlock
 	-- the jet's radar slew commands (numbers from Logs\f15sit_icmd.lua, written
 	-- by the add-on's block in the F-15C's controls file): do they reach us?
 	pcall(function()
@@ -1920,7 +2123,7 @@ end
 --   up     VSD has the cursor: SIT takes it (SIT page shown); SIT has it: back to the VSD
 --   right  VSD: A/A page; SIT: decenter
 --   left   A/A page: back to SIT; SIT: EXP (10 NM around the cursor)
---   down   SIT: formation (F5)
+--   down   SIT: formation (F5); held 1 s: declutter step
 hotas = function(cmd)
 	local HS = SIT_HOTAS
 	if cmd == HS.CASTLE_UP then
@@ -1988,14 +2191,15 @@ end
 local function draw_missiles(t)
 	local list = (feed.msl and t - (feed.msl_t or -10) < 3) and feed.msl or {}
 	local el = t - (feed.msl_t or t)
+	-- (the fly-out line flashes; the line to the locked target with it while
+	-- a missile flies: draw_lock reads G.msl_fly / G.msl_flash)
+	local fs = SIT.MSL_FLASH_S or 0.5
+	local flash_on = fs <= 0 or floor(t / fs) % 2 == 0
+	G.msl_fly, G.msl_flash = false, flash_on
 	for k = 1, SIT.MAX_MSL do
 		local h, m = H.msl[k], list[k]
-		local mv, tv = 0, 0
+		local mv, tv, lv = 0, 0, 0
 		local mx, my, tx, ty
-		if m and m.m and m.mx then
-			mx, my = to_screen(m.mx - G.ox, m.mz - G.oz)
-			if inside(mx, my) then h.x:set(mx); h.y:set(my); mv = 1 end
-		end
 		if m and m.tg and m.tx then
 			tx, ty = to_screen(m.tx - G.ox, m.tz - G.oz)
 			if inside(tx, ty) then
@@ -2004,11 +2208,27 @@ local function draw_missiles(t)
 				h.txt:set(safe_text(s))
 			end
 		end
+		if m and m.m and m.mx then
+			mx, my = to_screen(m.mx - G.ox, m.mz - G.oz)
+			-- at the missile: a circle; an AIM-120 inside the MPRF range of its
+			-- target (its own seeker has it): an X
+			local sym = 1
+			if m.typ == "A" and m.tg and m.tx then
+				local dd = sqrt((m.mx - m.tx) ^ 2 + (m.mz - m.tz) ^ 2)
+				if dd <= (SIT.MSL_MPRF_NM or 7) * NM then sym = 2 end
+			end
+			h.sym:set(sym)
+			if inside(mx, my) then h.x:set(mx); h.y:set(my); mv = 1 end
+		end
 		h.vis:set(mv); h.tvis:set(tv)
-		if mv == 1 and tv == 1 then
-			local a1, a2, b1, b2 = clip(mx, my, tx, ty)
-			if a1 then h.l.ax:set(a1); h.l.ay:set(a2); h.l.bx:set(b1); h.l.by:set(b2); h.l.vis:set(1) else h.l.vis:set(0) end
-		else h.l.vis:set(0) end
+		if mx and tv == 1 then
+			G.msl_fly = true
+			if flash_on then
+				local a1, a2, b1, b2 = clip(mx, my, tx, ty)
+				if a1 then h.l.ax:set(a1); h.l.ay:set(a2); h.l.bx:set(b1); h.l.by:set(b2); lv = 1 end
+			end
+		end
+		h.l.vis:set(lv)
 	end
 end
 -- mark points: an x with its number and bearing / range from us
@@ -2048,6 +2268,7 @@ local function power_tick(t)
 	end
 	local on = PWR.sw or (rpm ~= nil and rpm >= SIT.RPM_ON)
 	PWR.on = on
+	H.jpwr:set(on and 1 or 0)            -- (for the helmet display)
 	local disp = on and ST.mode > 0
 	-- coming on (power, or the knob out of OFF): start-up, then the DTM page
 	if disp and not PWR.disp then PWR.boot_t = t; ST.page = PG.DTM; PGF.now = true end
@@ -2068,10 +2289,144 @@ local function power_tick(t)
 	return PWR.shown
 end
 
+-- JHMCS: the radar lock and jet power for the helmet device (HMD/hmd_device.lua),
+-- as cockpit parameters: world position (x north, z east, y up, metres),
+-- velocity (m/s), the model time of the report, 1/0 valid
+-- (HLK_*: the SIT page's own lock symbol already uses LK_*)
+local LKP = {x = P("HLK_X"), z = P("HLK_Z"), y = P("HLK_Y"), vx = P("HLK_VX"), vz = P("HLK_VZ"),
+	t = P("HLK_T"), on = P("HLK_ON")}
+local function publish_lock(t)
+	local L = feed.lock
+	if L and t - L.t <= 3 and t >= L.t then
+		LKP.x:set(L.x); LKP.z:set(L.z); LKP.y:set(L.y or 0)
+		LKP.vx:set(L.vx or 0); LKP.vz:set(L.vz or 0); LKP.t:set(L.t); LKP.on:set(1)
+	else
+		LKP.on:set(0)
+	end
+end
+
+-- JHMCS: master mode, weapon, steerpoint, the lock's identity and the
+-- datalink picture for the helmet device (HMD/hmd_device.lua):
+--   HMST 1 A/A, 2 NAV, 0 other
+--   HWPN_K 0 none, 1 radar missile, 2 AIM-9, 3 gun; HWPN_T "A4C" (letter, count,
+--     model: A = AIM-120, M = AIM-7, S = AIM-9, as the real JHMCS); HWPN_N rounds
+--   HWP_ON / X / Z the active steerpoint
+--   HLK_ID 1 friendly, 2 hostile, 0 unknown; HLK_RA / RM / RP / RT envelope (m)
+--   HCN contacts, HC<n>_K kind (1 friendly, 2 flight member, 3 hostile,
+--     4 unknown, 5 SAM), X Z Y VX VZ (m, m/s), T report time, L name
+local HM = {mst = P("HMST"), wk = P("HWPN_K"), wt = PT("HWPN_T"), wn = P("HWPN_N"),
+	wp_on = P("HWP_ON"), wp_x = P("HWP_X"), wp_z = P("HWP_Z"),
+	id = P("HLK_ID"), ra = P("HLK_RA"), rm = P("HLK_RM"), rp = P("HLK_RP"), rt = P("HLK_RT"),
+	n = P("HCN"), c = {}}
+local HMC_MAX = 48
+for n = 1, HMC_MAX do
+	local p = "HC" .. n .. "_"
+	HM.c[n] = {k = P(p .. "K"), x = P(p .. "X"), z = P(p .. "Z"), y = P(p .. "Y"), vx = P(p .. "VX"), vz = P(p .. "VZ"),
+		t = P(p .. "T"), l = PT(p .. "L")}
+end
+HM.n:set(0)
+local HM_KIND = {[1] = 1, [2] = 3, [3] = 4, [4] = 1, [5] = 2, [6] = 1}
+local HM_LETTER = {a = "A", s = "M", m = "S"}
+-- a short name: letters and digits, upper case, at most n characters
+local function short(s, n)
+	s = tostring(s or ""):upper():gsub("[^%w]", "")
+	return s:sub(1, n)
+end
+local HM_TAKE, HM_SKIP = {}, {}
+local function publish_hmd(t)
+	if H.jpwr.v ~= 1 then return end
+	local stale = (t - feed.rx) > SIT.STALE_S
+	-- master mode
+	local m = feed.master
+	HM.mst:set(m == "A/A" and 1 or (m == "NAV" and 2 or 0))
+	-- selected weapon
+	local s = feed.sta and feed.sta[feed.cur_sta or 0]
+	local cl = s and s.n > 0 and store_class(s.name)
+	if feed.gun then
+		-- (gun mode: FC3 keeps the last missile station selected)
+		HM.wk:set(3); HM.wn:set(feed.cm and feed.cm.gun or 0)
+	elseif cl then
+		-- (count: all missiles of that kind, model: the selected one's)
+		local cnt = feed.stores and feed.stores[cl] or 0
+		local model = s.name:upper():match("(%a)[^%a]*$") or ""
+		HM.wk:set(cl == "m" and 2 or 1)
+		HM.wt:set(HM_LETTER[cl] .. cnt .. model)
+	elseif m == "A/A" then
+		HM.wk:set(3); HM.wn:set(feed.cm and feed.cm.gun or 0)
+	else
+		HM.wk:set(0)
+	end
+	-- steerpoint
+	local w = (feed.active or 0) > 0 and feed.wpts and feed.wpts[feed.active]
+	if w then HM.wp_on:set(1); HM.wp_x:set(w.x); HM.wp_z:set(w.z) else HM.wp_on:set(0) end
+	-- the lock: envelope and identity (the contact on it)
+	local list = EWR.merge(feed.list, t, stale)
+	local L = feed.lock
+	if L then
+		HM.ra:set(L.ra or 0); HM.rm:set(L.rm or 0); HM.rp:set(L.rp or 0); HM.rt:set(L.rt or 0)
+		local id, bd = 0, 1500
+		for _, c in ipairs(list) do
+			local d = math.max(abs(c.x - L.x), abs(c.z - L.z))
+			if d < bd then
+				bd = d
+				local b = (c.code or 0) % 10
+				id = (b == 2) and 2 or ((b == 1 or b == 4 or b == 5 or b == 6) and 1 or 0)
+			end
+		end
+		HM.id:set(id)
+	end
+	-- contacts: flight members take their contact (as on the SIT page)
+	local members = stale and NOMEM or flt_members()
+	for k in pairs(HM_TAKE) do HM_TAKE[k] = nil end
+	for k in pairs(HM_SKIP) do HM_SKIP[k] = nil end
+	for _, a in ipairs(members) do
+		local best, bd = nil, SIT.FLT_MATCH_M
+		for i, c in ipairs(list) do
+			local b = (c.code or 0) % 10
+			if b ~= 2 and b ~= 4 then
+				local d = math.max(abs(c.x - a.x), abs(c.z - a.z))
+				if d < SIT.FLT_MATCH_M then HM_SKIP[i] = true; if d < bd then best, bd = i, d end end
+			end
+		end
+		a.hm = best ~= nil
+		if best then HM_TAKE[best] = a; HM_SKIP[best] = nil end
+	end
+	local n = 0
+	local function put(k, x, z, y, vx, vz, tt, l)
+		if n >= HMC_MAX then return end
+		n = n + 1
+		local o = HM.c[n]
+		o.k:set(k); o.x:set(x); o.z:set(z); o.y:set(y or 0); o.vx:set(vx or 0); o.vz:set(vz or 0); o.t:set(tt or t)
+		-- (a SAM's number stays a bare number for the helmet: it shows it in a number field)
+		o.l:set(k == 5 and tostring(l or "") or safe_text(l))
+	end
+	local function callsign(a) return short(a.unit:match("^%a+") or a.unit, 3) .. (a.num or "") end
+	for i, c in ipairs(list) do
+		local k = HM_KIND[(c.code or 0) % 10]
+		if k and not HM_SKIP[i] then
+			local mem = HM_TAKE[i]
+			if mem then put(2, c.x, c.z, c.y, c.vx, c.vz, c.t, callsign(mem))
+			else put(k, c.x, c.z, c.y, c.vx, c.vz, c.t, (k <= 2) and short(c.nm, 4) or "") end
+		end
+	end
+	for _, a in ipairs(members) do
+		if not a.hm then put(2, a.x, a.z, a.y, a.vx, a.vz, feed.rx, callsign(a)) end
+	end
+	if not stale then
+		for _, g in ipairs(feed.thr or {}) do
+			-- (SAM sites only: early-warning radars have no ring)
+			if (g.ring or 0) > 0 then put(5, g.x, g.z, g.y, 0, 0, t, short((tostring(g.lbl):gsub("^SA%-?", "")), 4)) end
+		end
+	end
+	HM.n:set(n)
+end
+
 local function update_body()
 	tick = tick + 1
 	read_udp()
 	local t = now()
+	hmd_controls_tick(t)
+	acq_tick(t)
 	local sd = sensors()
 	if not sd then return end
 
@@ -2084,6 +2439,12 @@ local function update_body()
 		if EWR.n <= 3 then log("EWR report " .. EWR.n .. ": " .. #(EWR.fr or {}) .. " friendly, " .. #(EWR.hs or {}) .. " hostile") end
 	end
 	G.hdg = (okh and h) and ((-h) % TWO_PI) or 0         -- true heading, clockwise from north
+	-- (for the helmet device: nothing to do while it is switched off in Options > Special)
+	if HMD.ENABLED ~= false then
+		pcall(publish_lock, t)
+		local ok, err = pcall(publish_hmd, t)
+		if not ok and not G.hm_err then G.hm_err = true; log("hmd publish: " .. tostring(err)) end
+	end
 	-- no power / display off / starting up: nothing to draw, no cursor, no scan
 	if not power_tick(t) then
 		if ST.soi_sit then

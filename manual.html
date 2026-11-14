@@ -201,14 +201,14 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
     <a href="./#pages">Pages</a>
     <a href="./#dtm">DTM Planner</a>
     <a href="manual.html" aria-current="page">Pilot manual</a>
-    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.0/F-15C.SIT.WW.1.0.zip">Download v1.0</a>
+    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.1/F-15C.SIT.WW.1.1.zip">Download v1.1</a>
   </nav>
 </div></header>
 <div class="wrap man">
-  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
+  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#jhmcs">JHMCS helmet display</a></li><li><a href="#radar-acquisition">Radar acquisition and weapon switches</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
   <article class="doc">
     <h1>F-15C SIT Pilot Manual</h1>
-    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.0: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C.</p>
+    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.1: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C, the JHMCS helmet display and the radar acquisition switches on the HOTAS.</p>
 <h2 id="before-you-fly">Before you fly</h2>
 
 <p>You need DCS World with the F-15C from Flaming Cliffs. Nothing else is required; <a href="https://github.com/ciribob/DCS-SimpleRadioStandalone">SRS</a> is used by the RADIO page if you have it.</p>
@@ -221,7 +221,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <p><strong>After every DCS update or repair</strong> run <code>INSTALL.bat</code> again: DCS puts its own controls file back and the add-on's controls disappear until you do. Your own key assignments are kept and come back with them.</p>
 <p>If the installer cannot find your DCS install, run it from a command prompt in the add-on folder: <code>INSTALL.bat -DcsPath "D:\DCS World"</code>. With DCS under <code>C:\Program Files</code>, right-click <code>INSTALL.bat</code> &gt; Run as administrator.</p>
 <p><strong>Remove:</strong> <code>UNINSTALL.bat</code> takes the controls, the Export.lua line and the scripts out again; then delete the add-on folder.</p>
-<p><strong>Controls:</strong> Options &gt; Controls &gt; F-15C, category <strong>F-15C SIT</strong>. Bind at least the castle switch (up, down, left, right). See <a href="#hotas-and-keybinds">HOTAS and keybinds</a> for the full list.</p>
+<p><strong>Controls:</strong> Options &gt; Controls &gt; F-15C, category <strong>F-15C SIT</strong>. Bind at least the castle switch (up, down, left, right). See <a href="#hotas-and-keybinds">HOTAS and keybinds</a> for the full list. The zip also has <code>F-15C SIT Controls Guide.pdf</code>, a printable list of every control for your pilots.</p>
 
 <h2 id="power-and-start-up">Power and start-up</h2>
 
@@ -257,7 +257,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 
 <h2 id="sit-page">SIT page</h2>
 
-<figure class="fig"><div class="shot"><img src="img/p_sit_hook.jpg" alt="SIT page at 160 NM with the cursor on a contact" width="1000" height="1000" loading="lazy"></div><figcaption>SIT page at 160 NM, the cursor on a friendly F-15E</figcaption></figure><ol class="legend"><li>Top left: time (Zulu or local, set on TIME / DATE). With the cursor on a contact: its data block (identity and name, bearing / range, altitude in thousands of feet and speed, aspect).</li><li>Top right: the range in NM from your jet to the top of the SIT area; below it in cyan the cursor's bearing and range from you (no cursor: the active steerpoint).</li><li>Cyan lines: the edges of your radar's scan, out to its range scale.</li><li>Left: L5 SET opens SIT SETTINGS; below it your missiles (A AIM-120, M AIM-9, S AIM-7) and gun rounds (G).</li><li>Right: R3 AUTO / MAN range, R5 MENU. Bottom right: chaff (C) and flares (F), the selected CMD program, RWR filter, ICS bands, the bullseye readout in yellow (the cursor from the bullseye) and the master mode.</li></ol>
+<figure class="fig"><div class="shot"><img src="img/p_sit_hook.jpg" alt="SIT page at 160 NM with the cursor on a contact" width="1000" height="1000" loading="lazy"></div><figcaption>SIT page at 160 NM, the cursor on a friendly F-15E</figcaption></figure><ol class="legend"><li>Top left: time (Zulu or local, set on TIME / DATE). With the cursor on a contact: its data block (identity and name, bearing / range, altitude in thousands of feet and speed, aspect).</li><li>Top right: the range in NM from your jet to the top of the SIT area; below it in cyan the cursor's bearing and range from you (no cursor: the active steerpoint).</li><li>Cyan lines: the edges of your radar's scan, out to its range scale.</li><li>Left: L5 SET opens SIT SETTINGS. Bottom left: the weapon inventory, e.g. <code>A4C M2MH S2M G9</code>: A AIM-120, M AIM-7, S AIM-9 with count and model (here 4 AIM-120C, 2 AIM-7MH, 2 AIM-9M), G gun rounds in hundreds. The selected weapon is boxed.</li><li>Right: R3 AUTO / MAN range, R5 MENU. Bottom right: chaff (C) and flares (F), the selected CMD program, RWR filter, ICS bands, the bullseye readout in yellow (the cursor from the bullseye) and the master mode.</li></ol>
 <p><strong>Symbols</strong></p>
 <div class="tbl"><table><thead><tr><th>Symbol</th><th>Meaning</th></tr></thead><tbody>
 <tr><td>green circle</td><td>Friendly. Solid: on your radar; dotted: datalink only. A dot inside: AWACS (large circle) or a friendly datalink fighter.</td></tr>
@@ -265,12 +265,13 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <tr><td>white square</td><td>Unknown: not identified. Solid: on your radar only; dotted: datalink.</td></tr>
 <tr><td>cyan circle + number</td><td>Your flight members (see <a href="#flight-data">FLIGHT DATA</a>).</td></tr>
 <tr><td>course tick, number</td><td>A short line shows where a moving contact is heading; the number below is its altitude in thousands of feet.</td></tr>
-<tr><td>white brackets, blue line</td><td>The target your radar is locked on, and the line from you to it.</td></tr>
+<tr><td>white brackets, blue line</td><td>The target your radar is locked on (STT, or the tracks in TWS, following the target), and the line from you to it.</td></tr>
 <tr><td>red ring, label</td><td>Enemy SAM site and its engagement ring (brighter while you are inside it).</td></tr>
 <tr><td>yellow triangles, line</td><td>Your route; the active steerpoint has a second, larger triangle.</td></tr>
 <tr><td>yellow double circle</td><td>Bullseye.</td></tr>
 <tr><td>cyan lines, labels</td><td>Mission drawings or your cartridge's lines (FLOT, borders, areas, rings).</td></tr>
-<tr><td>missile mark, line, A 23</td><td>Your missile in flight, the line to its target, and the seconds to impact.</td></tr>
+<tr><td>missile circle, flashing line, 23</td><td>Your missile in flight and its fly-out line to the target, flashing; the seconds to impact in small magenta figures left of the target.</td></tr>
+<tr><td>X on the missile line</td><td>AIM-120 within 7 NM of its target (MPRF, going active): the missile circle turns into an X. The line from you to the locked target flashes too.</td></tr>
 <tr><td>x, M1 045/12</td><td>Mark point with its number and bearing / range from you.</td></tr>
 </tbody></table></div>
 <p><strong>Range and view</strong></p>
@@ -348,6 +349,29 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <p>L1–L5 list the friendly aircraft near you, players first (marked *); B2 / B4 page through them. Press one to make it a flight member (boxed) or to drop it; the aircraft of your own group are members anyway. Members are numbered 2, 3, 4 ... (by unit name) and drawn in cyan with their number on the SIT page; the right side gives each one's bearing / range, altitude and ground speed. Your picks are remembered between flights.</p>
 <p><strong>BIT</strong> shows CBIT (continuous) or IBIT (a 6 second test) with the jet's failed systems as NO GO lines.</p>
 
+<h2 id="jhmcs">JHMCS helmet display</h2>
+
+<p>Green helmet symbology that follows your head, drawn on the helmet (the same picture in both eyes in VR).</p>
+<ul>
+<li><strong>Always:</strong> heading tape (where you look, the aircraft heading under the caret), IAS, altitude, Mach, G, the selected weapon or gun rounds, and the range to the NAV steerpoint.</li>
+<li><strong>A/A:</strong> a box on the locked target with its range and altitude, shoot cue and launch zone; a locator line toward the target when it is off the display; datalink and flight member contacts. Contacts outside the display are pinned at its edge (20&deg;).</li>
+<li><strong>Looking into the cockpit</strong> blanks it. <strong>Through the HUD</strong> only the SIT contacts and the acquisition mode stay, so you can use helmet acquisition and long range boresight while looking through the HUD.</li>
+<li><strong>Panel:</strong> left console, behind the caution lights: ON / OFF switch and a brightness knob (scroll). Hot and air starts begin ON at full brightness.</li>
+<li><strong>Options:</strong> turn it off completely, or scale the symbols (HMD size 50–200 %), under Options &gt; Special &gt; F-15C SIT.</li>
+</ul>
+
+<h2 id="radar-acquisition">Radar acquisition and weapon switches</h2>
+
+<p>The auto acquisition switch works as in the real Eagle. The add-on sets FC3's radar for you and moves its cursor; you get a lock without touching the radar cursor.</p>
+<ul>
+<li><strong>Forward, short: helmet acquisition.</strong> Look at the target; the radar searches along your line of sight and locks the first return. Without the helmet (switched off or disabled in the options) this is FC3 boresight.</li>
+<li><strong>Forward, hold 1 s: long range boresight.</strong> A narrow search out to long range, following the helmet (a 4&deg; circle on the helmet shows where). Takes a little longer to lock than helmet acquisition.</li>
+<li><strong>Aft: vertical scan. Depress: return to search</strong>, back to the radar mode you were in.</li>
+<li><strong>Supersearch</strong> (nose, 20&deg;, 10 NM) and <strong>Boresight</strong> have their own binds.</li>
+<li><strong>Weapon select:</strong> forward GUN, center SRM (AIM-9), aft MRM (AIM-7 / AIM-120). <strong>Missile reject</strong> steps to the next missile type of the same kind, e.g. AIM-120 to AIM-7. The helmet and the SIT inventory show the selection.</li>
+<li><strong>Target step</strong> (TWS): the radar cursor jumps to the next track. FC3 cannot make a different track the primary (PDT) without going STT, so press your normal lock to lock it. <strong>Unlock</strong>: STT back to search; in TWS it drops the track under the cursor.</li>
+</ul>
+
 <h2 id="hotas-and-keybinds">HOTAS and keybinds</h2>
 
 <p>Options &gt; Controls &gt; F-15C, category <strong>F-15C SIT</strong>:</p>
@@ -355,7 +379,14 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <tr><td>Castle Switch - Up</td><td>The SIT page takes the cursor (and is shown); again: back to the radar</td></tr>
 <tr><td>Castle Switch - Right</td><td>SIT cursor: decenter on / off. Radar cursor: A/A page</td></tr>
 <tr><td>Castle Switch - Left</td><td>SIT cursor: EXP on / off. On the A/A page: back to SIT</td></tr>
-<tr><td>Castle Switch - Down</td><td>SIT cursor: F5 (formation) on / off</td></tr>
+<tr><td>Castle Switch - Down</td><td>SIT cursor: F5 (formation) on / off. Hold 1 s: next declutter step</td></tr>
+<tr><td>Auto Acq Switch - Forward</td><td>Short: helmet acquisition (without the helmet: boresight). Hold 1 s: long range boresight, cued by the helmet</td></tr>
+<tr><td>Auto Acq Switch - Aft / Depress</td><td>Vertical scan / return to search</td></tr>
+<tr><td>Supersearch, Boresight</td><td>Supersearch (nose, 20&deg;, 10 NM); FC3 boresight</td></tr>
+<tr><td>Weapon Select Switch - Forward / Center / Aft</td><td>GUN / SRM (AIM-9) / MRM (AIM-7, AIM-120)</td></tr>
+<tr><td>Missile Reject Switch</td><td>Next missile type of the same kind</td></tr>
+<tr><td>Target Step</td><td>TWS: the cursor jumps to the next track</td></tr>
+<tr><td>Unlock Target</td><td>STT: back to search. TWS: drop the track under the cursor</td></tr>
 <tr><td>SIT Cursor - Up / Down / Left / Right, Horizontal / Vertical (axis)</td><td>Move the SIT cursor (the jet's TDC slew does too)</td></tr>
 <tr><td>SIT Range Increase / Decrease</td><td>SIT range one step (the radar's zoom keys too, while SIT has the cursor)</td></tr>
 <tr><td>SIT Declutter (step)</td><td>Next declutter step</td></tr>
@@ -364,6 +395,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <tr><td>Combat Jettison (CBT JETT program)</td><td>Jettison the active jettison program</td></tr>
 <tr><td>UHF-1 / UHF-2 Channel Up / Down - SRS</td><td>Step the radio presets</td></tr>
 <tr><td>MPCD Lower Left - Top / Bottom / Left / Right 1-5</td><td>The 20 bezel buttons</td></tr>
+<tr><td>HMD Power ON/OFF, HMD Brightness Increase / Decrease, HMD Symbology ON/OFF</td><td>The helmet display (power mutes it without moving the cockpit switch)</td></tr>
 </tbody></table></div>
 
 <h2 id="datalink-and-servers">Datalink and servers</h2>
@@ -393,14 +425,18 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <p><strong>Options &gt; Special &gt; F-15C SIT</strong></p>
 <ul>
 <li><strong>F-15C SIT add-on:</strong> off gives you the stock F-15C; nothing of the add-on runs.</li>
-<li><strong>Datalink:</strong> off shows only your own radar on the SIT page (no AWACS, flight or EWR contacts); everything else stays on.</li>
+<li><strong>Datalink:</strong> off shows only your own radar on the SIT page (no AWACS, flight or EWR contacts); everything else stays on. FC3 only gives the add-on the targets you lock (STT, or the tracks in TWS) and the odd search contact, so with the datalink off, lock targets to see them on the SIT page.</li>
+<li><strong>JHMCS helmet display:</strong> off removes the helmet display entirely.</li>
+<li><strong>HMD size, %:</strong> 50 to 200, scales the helmet symbology.</li>
 <li><strong>Timing and debug logs:</strong> for testing only; leave it off.</li>
 </ul>
+<p><strong>SIT page on a second monitor:</strong> name a viewport <code>F15C_SIT</code> in your monitor setup file (<code>Saved Games\DCS\Config\MonitorSetup</code>), or use <code>RIGHT_MFCD</code> as a fallback. Without either nothing changes.</p>
 <p><strong>The add-on's controls are gone:</strong> DCS was updated or repaired. Run <code>INSTALL.bat</code> again.</p>
 <p><strong>The SIT page shows no contacts and says NO DL:</strong> the export script is not running. Run <code>INSTALL.bat</code> again; check that <code>Saved Games\DCS\Scripts\Export.lua</code> has the F-15C SIT line.</p>
 <p><strong>The radio page does not tune SRS:</strong> SRS must be running and connected, and its UDP command port must be 9040.</p>
 <p><strong>The display stays dark:</strong> switch on the electric power or start an engine, and check the OFF / NIGHT / DAY knob is not at OFF.</p>
-<p><strong>Logs</strong> for bug reports: <code>Saved Games\DCS\Logs\f15sit_device.log</code>, <code>f15sit_export.log</code>, <code>f15sit_hook.log</code>.</p>
+<p><strong>Logs</strong> for bug reports: <code>Saved Games\DCS\Logs\f15sit_device.log</code>, <code>f15sit_export.log</code>, <code>f15sit_hook.log</code>, <code>f15sit_acq.log</code> (auto acquisition), <code>f15sit_wpn.log</code> (weapon switches, target step).</p>
+<p><strong>Helmet acquisition does not lock:</strong> keep the target near the centre of the helmet, and give it a moment; a bigger return nearby can take the lock first.</p>
 
 
   </article>

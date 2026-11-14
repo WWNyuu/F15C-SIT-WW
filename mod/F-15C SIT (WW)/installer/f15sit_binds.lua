@@ -18,14 +18,24 @@ do
 				-- "TDC Slew Horizontal / Vertical" (the pilot's slew axis)
 				", sel_h = " .. tostring(iCommandPlaneSelecterHorizontalAbs) .. ", sel_v = " .. tostring(iCommandPlaneSelecterVerticalAbs) ..
 				", zoom_in = " .. tostring(iCommandPlaneZoomIn) .. ", zoom_out = " .. tostring(iCommandPlaneZoomOut) ..
-				", power = " .. tostring(iCommandPowerOnOff) .. "}\n")
+				", power = " .. tostring(iCommandPowerOnOff) ..
+				-- auto acquisition (v1.1): lock, radar modes, return to search, scan height
+				", lock = " .. tostring(iCommandPlaneChangeLock) .. ", lock_up = " .. tostring(iCommandPlaneChangeLockUp) ..
+				", m_bvr = " .. tostring(iCommandPlaneModeBVR) .. ", m_vs = " .. tostring(iCommandPlaneModeVS) ..
+				", m_bore = " .. tostring(iCommandPlaneModeBore) .. ", reset = " .. tostring(iCommandSensorReset) ..
+				", sz_up = " .. tostring(iCommandSelecterUp) .. ", sz_dn = " .. tostring(iCommandSelecterDown) ..
+				", sz_stop = " .. tostring(iCommandSelecterStop) ..
+				-- weapon select / missile reject (v1.1)
+				", chg_wpn = " .. tostring(iCommandPlaneChangeWeapon) .. ", cannon = " .. tostring(iCommandPlaneModeCannon) ..
+				-- target step / unlock (v1.1)
+				", chg_tgt = " .. tostring(iCommandPlaneChangeTarget) .. ", tws_drop = " .. tostring(iCommandRefusalTWS) .. "}\n")
 			f:close()
 		end
 	end)
 end
 join(res.keyCommands, {
 {down = 6101, value_down = 1, name = _('Castle Switch - Up (SIT / VSD cursor)'), category = _('F-15C SIT')},
-{down = 6102, value_down = 1, name = _('Castle Switch - Down (SIT: Formation F5)'), category = _('F-15C SIT')},
+{down = 6102, up = 6102, value_down = 1, value_up = 0, name = _('Castle Switch - Down (SIT: Formation F5, hold 1 s: Declutter)'), category = _('F-15C SIT')},
 {down = 6103, value_down = 1, name = _('Castle Switch - Left (SIT: EXP / A/A: back to SIT)'), category = _('F-15C SIT')},
 {down = 6104, value_down = 1, name = _('Castle Switch - Right (SIT: Decenter / VSD: A/A page)'), category = _('F-15C SIT')},
 {down = 6105, value_down = 1, name = _('CMD - Dispense selected program'), category = _('F-15C SIT')},
@@ -34,12 +44,27 @@ join(res.keyCommands, {
 {down = 6108, value_down = 1, name = _('SIT Declutter (step)'), category = _('F-15C SIT')},
 {down = 6109, value_down = 1, name = _('SIT Range Increase'), category = _('F-15C SIT')},
 {down = 6120, value_down = 1, name = _('SIT Range Decrease'), category = _('F-15C SIT')},
+{down = 6160, up = 6160, value_down = 1, value_up = 0, name = _('Auto Acq Switch - Forward (short: Helmet Acquisition, no helmet: Boresight; hold 1 s: Long Range Boresight)'), category = _('F-15C SIT')},
+{down = 6161, up = 6161, value_down = 1, value_up = 0, name = _('Auto Acq Switch - Aft (Vertical Scan)'), category = _('F-15C SIT')},
+{down = 6162, up = 6162, value_down = 1, value_up = 0, name = _('Auto Acq Switch - Depress (Return to Search)'), category = _('F-15C SIT')},
+{down = 6170, value_down = 1, name = _('Supersearch (nose, 20 deg, 10 NM)'), category = _('F-15C SIT')},
+{down = 6171, value_down = 1, name = _('Boresight (FC3 boresight mode)'), category = _('F-15C SIT')},
+{down = 6164, value_down = 1, name = _('Weapon Select Switch - Forward (GUN)'), category = _('F-15C SIT')},
+{down = 6165, value_down = 1, name = _('Weapon Select Switch - Center (SRM: AIM-9)'), category = _('F-15C SIT')},
+{down = 6166, value_down = 1, name = _('Weapon Select Switch - Aft (MRM: AIM-7 / AIM-120)'), category = _('F-15C SIT')},
+{down = 6167, value_down = 1, name = _('Missile Reject Switch (next missile type of the same kind)'), category = _('F-15C SIT')},
+{down = 6168, value_down = 1, name = _('Target Step (TWS: cursor to the next track)'), category = _('F-15C SIT')},
+{down = 6169, value_down = 1, name = _('Unlock Target (STT: back to search, TWS: drop the track under the cursor)'), category = _('F-15C SIT')},
 {down = 6141, value_down = 1, name = _('SIT Mark Point (at the cursor)'), category = _('F-15C SIT')},
 {down = 6142, value_down = 1, name = _('SIT Delete Mark Point (at the cursor / newest)'), category = _('F-15C SIT')},
 {down = 6116, value_down = 1, name = _('UHF-1 (mission) Channel Up - SRS'), category = _('F-15C SIT')},
 {down = 6117, value_down = 1, name = _('UHF-1 (mission) Channel Down - SRS'), category = _('F-15C SIT')},
 {down = 6118, value_down = 1, name = _('UHF-2 (flight) Channel Up - SRS'), category = _('F-15C SIT')},
 {down = 6119, value_down = 1, name = _('UHF-2 (flight) Channel Down - SRS'), category = _('F-15C SIT')},
+{down = 6156, value_down = 1, name = _('HMD Power - ON/OFF'), category = _('F-15C SIT')},
+{down = 6150, value_down = 1, name = _('HMD Brightness - Increase'), category = _('F-15C SIT')},
+{down = 6151, value_down = 1, name = _('HMD Brightness - Decrease'), category = _('F-15C SIT')},
+{down = 6152, value_down = 1, name = _('HMD Symbology - ON/OFF'), category = _('F-15C SIT')},
 {down = 6110, up = 6110, value_down = 1, value_up = 0, name = _('SIT Cursor - Left'), category = _('F-15C SIT')},
 {down = 6111, up = 6111, value_down = 1, value_up = 0, name = _('SIT Cursor - Right'), category = _('F-15C SIT')},
 {down = 6112, up = 6112, value_down = 1, value_up = 0, name = _('SIT Cursor - Up'), category = _('F-15C SIT')},
