@@ -278,7 +278,7 @@ pre.geo { margin: 0; background: var(--bg); border: 1px solid var(--line); borde
         <section class="card">
           <h2>Cartridge <small id="cartSrc"></small></h2>
           <div class="field"><span>NAME</span><input id="cartName" maxlength="40" aria-label="Cartridge name"></div>
-          <p class="note">Saved as <b>NAME.dtc</b> (plus <b>NAME.geo.txt</b> with lines) for <b>Saved Games\DCS\DTC\F-15C</b>. In the jet: MENU › DTM, <b>CART</b> to pick it, <b>READ</b> to load. <b>MSN</b> in the jet is the mission itself.</p>
+          <p class="note">Saved as <b>NAME.dtc</b> (plus <b>NAME.geo.txt</b> with lines) for <b>Saved Games\DCS\DTC\F-15C</b>. In the jet: MENU › DTM, <b>CART</b> to pick it, <b>READ</b> to load. <b>MSN</b> in the jet is the mission itself. For the jet's own steerpoints (HUD steering): before you spawn, open the Route Tool on the F10 map, pick the preset <b>F-15C DTC: NAME</b> and tick <b>USE THIS ROUTE ON NEXT SPAWN</b>.</p>
         </section>
 
         <section class="card">
@@ -1684,7 +1684,7 @@ async function cartFromDtc(json, src) {
 function buildDtc() {
   const c = S.cart, f = c.f15;
   const out = { type: "F-15C SIT DTC", version: 1, name: c.name, terrain: c.terrain || "Caucasus",
-    route: NAV().pts.map(p => ({ lat: +p.lat.toFixed(5), lon: +p.lon.toFixed(5), name: asciiName(p.name || ""), alt: Math.round(+p.alt || 0) })),
+    route: NAV().pts.map(p => { const [x, y] = TM.toXY(p.lat, p.lon); return { lat: +p.lat.toFixed(5), lon: +p.lon.toFixed(5), name: asciiName(p.name || ""), alt: Math.round(+p.alt || 0), x: +x.toFixed(1), y: +y.toFixed(1) }; }),
     jtids: { fighter_channel: f.fch, voice_channel: f.vch, flight: f.flight.filter(Boolean) },
     pacs: { cmd: f.cmd, pf: f.pf, jett1: f.jett1, jett2: f.jett2,
       programs: Object.fromEntries(Object.entries(f.programs).map(([k, q]) => [k, { chaff: q[0], flare: q[1], interval: q[2], cycles: q[3] }])) },

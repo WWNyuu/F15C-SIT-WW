@@ -28,7 +28,8 @@ do
 				-- weapon select / missile reject (v1.1)
 				", chg_wpn = " .. tostring(iCommandPlaneChangeWeapon) .. ", cannon = " .. tostring(iCommandPlaneModeCannon) ..
 				-- target step / unlock (v1.1)
-				", chg_tgt = " .. tostring(iCommandPlaneChangeTarget) .. ", tws_drop = " .. tostring(iCommandRefusalTWS) .. "}\n")
+				", chg_tgt = " .. tostring(iCommandPlaneChangeTarget) .. ", tws_drop = " .. tostring(iCommandRefusalTWS) ..
+				", nav_lt = " .. tostring(iCommandPlaneLightsOnOff) .. ", acol_lt = " .. tostring(iCommandPlaneAntiCollisionLights) .. "}\n")
 			f:close()
 		end
 	end)
@@ -61,6 +62,10 @@ join(res.keyCommands, {
 {down = 6117, value_down = 1, name = _('UHF-1 (mission) Channel Down - SRS'), category = _('F-15C SIT')},
 {down = 6118, value_down = 1, name = _('UHF-2 (flight) Channel Up - SRS'), category = _('F-15C SIT')},
 {down = 6119, value_down = 1, name = _('UHF-2 (flight) Channel Down - SRS'), category = _('F-15C SIT')},
+{down = 6172, value_down = 1, name = _('UHF-1 (mission) Volume Up - SRS'), category = _('F-15C SIT')},
+{down = 6173, value_down = 1, name = _('UHF-1 (mission) Volume Down - SRS'), category = _('F-15C SIT')},
+{down = 6174, value_down = 1, name = _('UHF-2 (flight) Volume Up - SRS'), category = _('F-15C SIT')},
+{down = 6175, value_down = 1, name = _('UHF-2 (flight) Volume Down - SRS'), category = _('F-15C SIT')},
 {down = 6156, value_down = 1, name = _('HMD Power - ON/OFF'), category = _('F-15C SIT')},
 {down = 6150, value_down = 1, name = _('HMD Brightness - Increase'), category = _('F-15C SIT')},
 {down = 6151, value_down = 1, name = _('HMD Brightness - Decrease'), category = _('F-15C SIT')},

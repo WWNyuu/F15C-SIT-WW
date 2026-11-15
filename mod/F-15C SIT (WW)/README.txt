@@ -1,8 +1,23 @@
-F-15C SIT (WW) 1.1 - SIT page and JHMCS for the Flaming Cliffs F-15C
+F-15C SIT (WW) 1.2 - SIT page and JHMCS for the Flaming Cliffs F-15C
 =====================================================================
 
 All controls, what they do and where to bind them:
 F-15C SIT Controls Guide.pdf (in this folder).
+
+New in 1.2
+----------
+- Front UHF-1 radio panel (centre panel, under the HUD) works: channel
+  knob, the three frequency knobs (MAN), volume (SRS) and the CHAN / MAN /
+  GUARD knob; the CHAN and MAIN FREQ windows show the radio
+- IFF MODE 3/A wheels set the SRS transponder code, I/P = IDENT
+- SRS volume for UHF-1 / UHF-2: RADIO page and binds, 5 % steps
+- FLIGHT DATA page redesigned: four slots, put any aircraft (and yourself)
+  in any slot
+- SIT page WP+ / WP- (left 1 / 2): step the SIT's steerpoint
+- DTM cartridges become Route Tool presets ("F-15C DTC: <name>"): pick one
+  before you spawn and the jet flies the cartridge's route (HUD steering)
+- Exterior lights panel: FORMATION knob = anti-collision lights, POSITION
+  knob = navigation lights (click)
 
 New in 1.1
 ----------
@@ -56,8 +71,34 @@ The display
 - SIT SETTINGS (SIT left 5 "SET"): datalink status, DL / route / threat
   rings / lines on or off, course line, declutter, auto range.
 - MENU pages: A/A (stores, chaff / flares, ICS), CMDS programs, combat
-  jettison, weapon load, time / date, own data, flight data (pick your flight
-  members), RADIO, DTM cartridges.
+  jettison, weapon load, time / date, own data, flight data, RADIO, DTM
+  cartridges.
+- SIT page left 1 / 2: WP+ / WP- step the SIT's highlighted steerpoint (the
+  jet's own waypoint, and the HUD, stay). Until pressed, and again after a
+  DTM READ, the SIT follows the jet's waypoint.
+- FLIGHT DATA (MENU, right 3): left L1..L5 the friendly aircraft on the
+  datalink (their slot number in front, * = player), right R1..R4 your
+  flight as four cards (number, callsign, bearing / range, altitude,
+  speed; yours green). Pick an aircraft, then a slot (or a slot, then an
+  aircraft); a slot, then another slot swaps them. CLR empties the picked
+  slot, AUTO (boxed while on) puts your group in callsign order, you at
+  your own number. UP / DN page the list. Kept for the next flight.
+
+Front radio panel and IFF (new in 1.2)
+--------------------------------------
+Centre panel, under the HUD. ED's knobs can not be turned from a mod: they
+stay still, the numbers in the windows show the radio.
+- CHAN knob: left click up, right click down through UHF-1's 20 presets
+- The three frequency knobs: 10 MHz / 1 MHz / 25 kHz steps (left click up,
+  right click down); switches UHF-1 to MAN (225.000 - 399.975)
+- Mode knob: CHAN (the preset) / MAN (the frequency knobs) / GUARD (243.000)
+- VOL: SRS volume of UHF-1
+- IFF MODE 3/A: click the thumbwheel left of each digit (left click down,
+  right click up); the code goes to SRS (its IFF run from the SRS overlay,
+  as for Flaming Cliffs jets). I/P: IDENT for 18 s. Code and manual
+  frequency are kept for the next flight.
+- Exterior lights panel (left console): FORMATION knob = anti-collision
+  lights on / off, POSITION knob = navigation lights on / off
 
 JHMCS helmet display (new in 1.1)
 ---------------------------------
@@ -99,7 +140,7 @@ Controls (Options > Controls > F-15C, category "F-15C SIT")
   zoom keys also work while the SIT page has the cursor), SIT Declutter
 - SIT Mark Point / Delete Mark Point
 - CMD Dispense / Next program, Combat Jettison
-- UHF-1 / UHF-2 Channel Up / Down (SRS)
+- UHF-1 / UHF-2 Channel Up / Down (SRS), UHF-1 / UHF-2 Volume Up / Down (SRS)
 - the 20 MPCD buttons
 - HMD Power ON/OFF (mutes the helmet display without moving the switch),
   HMD Brightness Increase / Decrease, HMD Symbology ON/OFF
@@ -109,13 +150,21 @@ Radios (SRS)
 The RADIO page shows UHF-1 (mission) and UHF-2 (flight) with 20 presets each
 (the mission's, or a DTM cartridge's). Picking a channel tunes SRS (its UDP
 command port, 9040 by default - SRS client setting). Channel frequencies can
-be changed on the page.
+be changed on the page. VOL + / - (left 3 / 4 UHF-1, right 3 / 4 UHF-2) and
+the volume binds set SRS's volume in 5 % steps (both radios start at 80 %).
 
 DTM Planner
 -----------
 DTM Planner\F-15C DTM Planner.html (open it in a browser): route, bullseye,
 drawings, radio presets and CMDS programs as cartridges, loaded in the jet on
-the DTM page.
+the DTM page. Save them into Saved Games\DCS\DTC\F-15C (NAME.dtc and
+NAME.geo.txt).
+The jet's own steerpoints (HUD steering) come from the mission at spawn.
+Every cartridge is also a Route Tool preset "F-15C DTC: NAME" (the add-on
+keeps Saved Games\DCS\Config\RouteToolPresets up to date; your own presets
+stay): before you spawn, open the Route Tool on the F10 map, pick it and
+tick USE THIS ROUTE ON NEXT SPAWN. Cartridges saved before 1.2: save them
+again from the planner once.
 
 Options > Special > F-15C SIT
 -----------------------------

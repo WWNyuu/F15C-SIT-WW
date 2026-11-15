@@ -133,10 +133,10 @@ end
 H.dcl_lv = PT("DCL_TXT"); H.dcl_pop = P("DCL_POP")
 H.jpwr = P("JPWR")                           -- jet power 1/0, for the helmet device
 H.boot = P("BOOT"); H.dim = P("DIM")          -- start-up screen phase, brightness cover (0..19)
-H.rad = {{}, {}}; H.rad_act = {}; H.rad_cur = {}
+H.rad = {{}, {}}; H.rad_act = {}; H.rad_cur = {}; H.rad_vol = {}
 for r = 1, 2 do
 	for k = 1, 20 do H.rad[r][k] = PT("RAD" .. r .. "_" .. k .. "_TXT") end
-	H.rad_act[r] = P("RAD" .. r .. "_ACT"); H.rad_cur[r] = PT("RAD" .. r .. "_CUR_TXT")
+	H.rad_act[r] = P("RAD" .. r .. "_ACT"); H.rad_cur[r] = PT("RAD" .. r .. "_CUR_TXT"); H.rad_vol[r] = PT("RAD" .. r .. "_VOL_TXT")
 end
 H.rad_edit = P("RAD_EDIT"); H.rad_etxt = PT("RAD_E_TXT"); H.rad_ecar = PT("RAD_EC_TXT"); H.rad_emsg = PT("RAD_EM_TXT")
 H.rad_src = PT("RAD_SRC_TXT")
@@ -150,16 +150,22 @@ H.td = {}
 for n = 1, 6 do H.td[n] = PT("TD" .. n .. "_TXT") end
 H.own = {}
 for n = 1, 11 do H.own[n] = PT("OWN" .. n .. "_TXT") end
-H.flt = {}
-for n = 1, 7 do H.flt[n] = PT("FLT" .. n .. "_TXT") end
+H.fs = {}
+for k = 1, 4 do
+	local p = "FS" .. k .. "_"
+	H.fs[k] = {n = PT(p .. "N_TXT"), d = PT(p .. "D_TXT"), own = P(p .. "OWN"), sel = P(p .. "SEL"), empty = P(p .. "EMPTY")}
+end
+H.fmode = P("FLT_AUTO"); H.fhint = PT("FLT_HINT_TXT")
 H.fc = {}
 for k = 1, 5 do H.fc[k] = {txt = PT("FC" .. k .. "_TXT"), on = P("FC" .. k .. "_ON")} end
 H.fc_pg = PT("FC_PG_TXT")
 local ALL_TEXT = {}         -- every page text parameter, set to "" before the first frame
 for _, h in ipairs({H.cmd, H.pf, H.jett, H.bit_txt, H.rngt, H.aa.sel, H.aa.ics, H.dtm_cart, H.dtm_loaded}) do ALL_TEXT[#ALL_TEXT + 1] = h end
-for _, t in ipairs({H.load, H.td, H.own, H.flt}) do for _, h in ipairs(t) do ALL_TEXT[#ALL_TEXT + 1] = h end end
+for _, t in ipairs({H.load, H.td, H.own}) do for _, h in ipairs(t) do ALL_TEXT[#ALL_TEXT + 1] = h end end
 for _, s in ipairs(H.sta) do ALL_TEXT[#ALL_TEXT + 1] = s.txt end
 for _, s in ipairs(H.fc) do ALL_TEXT[#ALL_TEXT + 1] = s.txt end
+for _, s in ipairs(H.fs) do ALL_TEXT[#ALL_TEXT + 1] = s.n; ALL_TEXT[#ALL_TEXT + 1] = s.d end
+ALL_TEXT[#ALL_TEXT + 1] = H.fhint
 ALL_TEXT[#ALL_TEXT + 1] = H.fc_pg
 for _, t in ipairs({H.hk, H.aa_b}) do for _, h in ipairs(t) do ALL_TEXT[#ALL_TEXT + 1] = h end end
 for _, g in ipairs(H.gl) do ALL_TEXT[#ALL_TEXT + 1] = g.txt end
@@ -198,10 +204,10 @@ local ST = {rng = SIT.RANGE_DEFAULT, center = true, nup = false, form = false,
             cmd = 1, pf = 1, trng = false, icsd = false,
             jprog = 1, jg = {[1] = {true, false, true, false, true}, [2] = {true, true, true, true, true}},
             ibit_t = -1000, bit_mode = 1,
-            flt = {}, flt_page = 0,     -- flt: unit names picked as flight members (FLIGHT DATA page)
+            slot = {"OWN"}, slot_man = false, flt_page = 0, fsel = nil,   -- the flight: slots 1-4 (FLIGHT DATA page)
             exp = false,
             soi_sit = false,            -- castle up: the SIT page has the cursor (TDC) instead of the VSD
-            autor = false, cm_row = 1, cm_fld = 1, dcl = 1, rch = {1, 1}, marks = {},              -- AUTO RANGE: SIT range follows the VSD range
+            autor = false, cm_row = 1, cm_fld = 1, dcl = 1, rch = {1, 1}, vol = {SIT.SRS_VOL_START or 80, SIT.SRS_VOL_START or 80}, marks = {},              -- AUTO RANGE: SIT range follows the VSD range
             mode = 2, brt = SIT.BRT_STEPS,   -- display knob (0 OFF, 1 NIGHT, 2 DAY), brightness step
             cart = 1, carts = nil,      -- DTM: choice (1 = MSN, 2.. = cartridge files)
             loaded = {name = "MSN"}}    -- the cartridge in use: {name, route, bull, geo} (nil fields = mission's)
@@ -214,8 +220,12 @@ local PF = {n = 0, sum = 0, max = 0, t = nil, blocks = 0, on = false}   -- timin
 local PWR = {sw = nil, on = true, disp = true, shown = true, boot_t = nil, cmd = nil, ready = nil, n_log = 0}
 local PGF = {now = true, last = nil}   -- MENU pages: redraw now (button pressed) / page last drawn
 
--- flight members picked on the FLIGHT DATA page, kept in
--- Saved Games\DCS\Config\F15SIT_flight.txt (one unit name per line)
+-- the flight on the FLIGHT DATA page (v1.1): slots 1-4, each "OWN" (the
+-- ownship), a unit name or empty. AUTO: the ownship and its group in
+-- unit-name order; any change on the page makes it manual. Kept in
+-- Saved Games\DCS\Config\F15SIT_flight.txt:
+--   #MODE=MAN / #MODE=AUTO, #SLOT<n>=OWN / #SLOT<n>=<unit name>
+-- (before v1.1 the file held unit names, one per line: read as a manual flight)
 local function flt_file()
 	local ok, l = pcall(require, "lfs")
 	return ok and l and (l.writedir() .. "Config/F15SIT_flight.txt") or nil
@@ -224,14 +234,36 @@ local function flt_load()
 	local fn = flt_file()
 	local f = fn and io.open(fn, "r")
 	if not f then return end
-	for line in f:lines() do if line ~= "" then ST.flt[line] = true end end
+	local old, own, slots, mode = {}, nil, {}, nil
+	for raw in f:lines() do
+		local line = raw:gsub("\r", "")
+		local k, v = line:match("^#SLOT(%d)=(.+)$")
+		if k then slots[tonumber(k)] = v
+		elseif line:match("^#MODE=") then mode = line:match("^#MODE=(%u+)")
+		elseif line:match("^#OWN=%d") then own = tonumber(line:match("^#OWN=(%d)"))
+		elseif line ~= "" then old[#old + 1] = line end
+	end
 	f:close()
+	if mode then
+		ST.slot_man = mode == "MAN"
+		if ST.slot_man then ST.slot = {} for k = 1, 4 do ST.slot[k] = slots[k] end end
+	elseif #old > 0 or own then
+		ST.slot_man, ST.slot = true, {}
+		ST.slot[own or 1] = "OWN"
+		table.sort(old)
+		for _, nm in ipairs(old) do
+			for k = 1, 4 do if not ST.slot[k] then ST.slot[k] = nm; break end end
+		end
+	end
 end
 local function flt_save()
 	local fn = flt_file()
 	local f = fn and io.open(fn, "w")
 	if not f then return end
-	for nm in pairs(ST.flt) do f:write(nm .. "\n") end
+	f:write("#MODE=" .. (ST.slot_man and "MAN" or "AUTO") .. "\n")
+	if ST.slot_man then
+		for k = 1, 4 do if ST.slot[k] then f:write("#SLOT" .. k .. "=" .. ST.slot[k] .. "\n") end end
+	end
 	f:close()
 end
 
@@ -584,9 +616,9 @@ local function dtm_name(i)
 	return c and c.name or "MSN"
 end
 local JETT_NAMES = {"L", "LC", "C", "RC", "R"}
-local srs_set    -- (RADIO page, below)
+local srs_set, rad_vol, srs_vol_tick, preset_tune, rfp_command    -- (RADIO page, below)
 local function dtm_apply()
-	if ST.cart == 1 then ST.loaded = {name = "MSN"}; return true end
+	if ST.cart == 1 then ST.loaded = {name = "MSN"}; ST.sit_act = nil; return true end
 	local c = ST.carts and ST.carts[ST.cart - 1]
 	if not c then return false end
 	local d = c.data
@@ -599,7 +631,7 @@ local function dtm_apply()
 	if tonumber(j.fighter_channel) then ST.fch = floor(tonumber(j.fighter_channel)) % 128 end
 	if j.own_tn then L.tn = tostring(j.own_tn) end
 	if type(j.flight) == "table" then
-		for _, nm in ipairs(j.flight) do if type(nm) == "string" and nm ~= "" then ST.flt[nm] = true end end
+		SIT_FLT_FROM_LIST(j.flight)
 		ST.flt_ver = (ST.flt_ver or 0) + 1
 		pcall(flt_save)
 	end
@@ -641,7 +673,7 @@ local function dtm_apply()
 			end
 		end
 		ST.rch = {1, 1}
-		for r = 1, 2 do local c = ST.rad_lists[r] and ST.rad_lists[r][1]; if c then srs_set(r, c.f) end end
+		for r = 1, 2 do local c = ST.rad_lists[r] and ST.rad_lists[r][1]; if c then preset_tune(r, c.f) end end
 	end
 	local s = type(d.sit) == "table" and d.sit or {}
 	for k, v in ipairs(SIT.RANGES_NM) do if v == tonumber(s.range) then ST.rng = k end end
@@ -650,36 +682,120 @@ local function dtm_apply()
 	if s.nup ~= nil then ST.nup = s.nup == true end
 	if s.zulu ~= nil then ST.zulu = s.zulu == true end
 	ST.loaded = L
+	ST.sit_act = nil
 	log("cartridge loaded: " .. c.name .. " (" .. #r .. " steerpoints, " .. #L.geo .. " drawings)")
 	return true
 end
 
--- FLIGHT DATA: the friendly aircraft offered on L1..L5 (this page of them)
--- flight members: the own group's aircraft and the ones picked; numbered
--- 2, 3, 4 ... in unit-name order (the ownship = 1)
+-- FLIGHT DATA (v1.1): the flight in slots 1-4. L1..L5 list the friendly
+-- aircraft; pick one, then a slot (R1..R4), or a slot, then an aircraft or
+-- another slot (swap). CLR empties the picked slot, AUTO goes back to the
+-- ownship and its group in unit-name order.
+local function own_name() return feed.own and feed.own.unit or "" end
+local AUTO_C = {src = nil, own = nil, slots = {"OWN"}}
+local function slots_now()
+	if ST.slot_man then return ST.slot end
+	if AUTO_C.src == feed.flight and AUTO_C.own == own_name() then return AUTO_C.slots end
+	local names = {{n = own_name(), own = true}}
+	for _, a in ipairs(feed.flight or {}) do
+		if a.own and a.unit ~= "" then names[#names + 1] = {n = a.unit} end
+	end
+	table.sort(names, function(p, q) return p.n < q.n end)
+	local sl = {}
+	for k = 1, math.min(4, #names) do sl[k] = names[k].own and "OWN" or names[k].n end
+	AUTO_C.src, AUTO_C.own, AUTO_C.slots = feed.flight, own_name(), sl
+	return sl
+end
+local function slot_of(unit)
+	local sl = slots_now()
+	for k = 1, 4 do if sl[k] == unit then return k end end
+	return nil
+end
+local function flt_find(unit)
+	for _, a in ipairs(feed.flight or {}) do if a.unit == unit then return a end end
+	return nil
+end
+local function flt_changed(hint)
+	ST.flt_ver = (ST.flt_ver or 0) + 1
+	ST.fsel = nil
+	if hint then ST.fhint, ST.fhint_t = hint, now() end
+	flt_save()
+end
+-- any change by hand: the page's flight becomes manual (starting from what is shown)
+local function freeze()
+	if ST.slot_man then return end
+	local sl = slots_now()
+	ST.slot = {}
+	for k = 1, 4 do ST.slot[k] = sl[k] end
+	ST.slot_man = true
+end
+local function put_in_slot(unit, k)
+	freeze()
+	local j = slot_of(unit)
+	local cur = ST.slot[k]
+	ST.slot[k] = unit
+	if j and j ~= k then ST.slot[j] = cur end
+	flt_changed()
+end
+-- a cartridge's flight list (DTM READ): the ownship stays where it is
+function SIT_FLT_FROM_LIST(list)
+	local own = slot_of("OWN") or 1
+	ST.slot, ST.slot_man = {}, true
+	ST.slot[own] = "OWN"
+	for _, nm in ipairs(list) do
+		if type(nm) == "string" and nm ~= "" then
+			for k = 1, 4 do if not ST.slot[k] then ST.slot[k] = nm; break end end
+		end
+	end
+	flt_changed()
+end
 local FLT_CACHE = {src = nil, ver = -1, list = {}}
 local function flt_members()
-	if FLT_CACHE.src == feed.flight and FLT_CACHE.ver == (ST.flt_ver or 0) then return FLT_CACHE.list end
-	local m = {}
-	for _, a in ipairs(feed.flight or {}) do
-		if a.own or ST.flt[a.unit] then m[#m + 1] = a end
+	if FLT_CACHE.src == feed.flight and FLT_CACHE.ver == (ST.flt_ver or 0) and FLT_CACHE.own == own_name() and not (not ST.slot_man and AUTO_C.src ~= feed.flight) then return FLT_CACHE.list end
+	local m, sl = {}, slots_now()
+	for k = 1, 4 do
+		local v = sl[k]
+		if v and v ~= "OWN" then
+			local a = flt_find(v)
+			if a then a.num = k; m[#m + 1] = a end
+		end
 	end
-	table.sort(m, function(p, q) return p.unit < q.unit end)
-	for k, a in ipairs(m) do a.num = k + 1 end
-	FLT_CACHE.src, FLT_CACHE.ver, FLT_CACHE.list = feed.flight, ST.flt_ver or 0, m
+	FLT_CACHE.src, FLT_CACHE.ver, FLT_CACHE.own, FLT_CACHE.list = feed.flight, ST.flt_ver or 0, own_name(), m
 	return m
 end
-local function flt_candidates()
-	local c = {}
-	for _, a in ipairs(feed.flight or {}) do if not a.own then c[#c + 1] = a end end
-	return c
-end
+local function flt_candidates() return feed.flight or {} end
 local function flt_pick(k)
 	local a = flt_candidates()[ST.flt_page * 5 + k]
 	if not a or a.unit == "" then return end
-	ST.flt[a.unit] = (not ST.flt[a.unit]) or nil
-	ST.flt_ver = (ST.flt_ver or 0) + 1
-	flt_save()
+	local sel = ST.fsel
+	if sel and sel.s then put_in_slot(a.unit, sel.s)
+	elseif sel and sel.c == a.unit then ST.fsel = nil
+	else ST.fsel = {c = a.unit} end
+end
+local function flt_slot(k)
+	local sel = ST.fsel
+	if sel and sel.c then put_in_slot(sel.c, k)
+	elseif sel and sel.s then
+		if sel.s ~= k then
+			freeze()
+			ST.slot[k], ST.slot[sel.s] = ST.slot[sel.s], ST.slot[k]
+			flt_changed()
+		else ST.fsel = nil end
+	elseif slots_now()[k] then ST.fsel = {s = k} end
+end
+local function flt_clr()
+	local sel = ST.fsel
+	local k = sel and (sel.s or slot_of(sel.c))
+	if not k then ST.fsel = nil; return end
+	if slots_now()[k] == "OWN" then ST.fsel = nil; ST.fhint, ST.fhint_t = "THE OWNSHIP STAYS IN THE FLIGHT", now(); return end
+	freeze()
+	ST.slot[k] = nil
+	flt_changed()
+end
+local function flt_auto()
+	ST.slot_man = false
+	AUTO_C.src = nil
+	flt_changed("AUTO: OWN GROUP IN NAME ORDER")
 end
 local function go(p) return function() ST.page = p end end
 local function cycle(key, list) return function() ST[key] = ST[key] % #list + 1 end end
@@ -733,6 +849,7 @@ local function page_cmds()
 end
 local ACTIONS = {
 	[PG.SIT] = {
+		L1 = function() wp_step(1) end, L2 = function() wp_step(-1) end,   -- WP+ / WP-
 		R3 = function() ST.autor = not ST.autor end,   -- range AUTO / MAN
 		R5 = go(PG.MENU),
 		L5 = go(PG.SETS),
@@ -803,8 +920,12 @@ local ACTIONS = {
 	[PG.FLT] = {
 		L1 = function() flt_pick(1) end, L2 = function() flt_pick(2) end, L3 = function() flt_pick(3) end,
 		L4 = function() flt_pick(4) end, L5 = function() flt_pick(5) end,
+		R1 = function() flt_slot(1) end, R2 = function() flt_slot(2) end,
+		R3 = function() flt_slot(3) end, R4 = function() flt_slot(4) end,
 		B2 = function() ST.flt_page = math.max(0, ST.flt_page - 1) end,
+		B3 = flt_clr,
 		B4 = function() ST.flt_page = ST.flt_page + 1 end,
+		B5 = flt_auto,
 		R5 = go(PG.MENU),
 	},
 	[PG.WPN] = {L1 = go(PG.ARMT), R5 = go(PG.MENU)},
@@ -812,6 +933,8 @@ local ACTIONS = {
 		-- UP = up the list (lower channel number), DN = down the list
 		L1 = function() rad_step(1, -1) end, L2 = function() rad_step(1, 1) end,
 		R1 = function() rad_step(2, -1) end, R2 = function() rad_step(2, 1) end,
+		L3 = function() rad_vol(1, 1) end, L4 = function() rad_vol(1, -1) end,
+		R3 = function() rad_vol(2, 1) end, R4 = function() rad_vol(2, -1) end,
 		T1 = function() rad_edit(1) end, T5 = function() rad_edit(2) end,
 		B1 = function() rad_edit_key("L") end, B2 = function() rad_edit_key("-") end,
 		B3 = function() rad_edit_key("E") end, B4 = function() rad_edit_key("+") end,
@@ -1070,6 +1193,20 @@ function SetCommand(command, value)
 	-- buttons and the page's HOTAS functions do nothing (radio, countermeasures
 	-- and jettison binds still work while the jet has power)
 	if not PWR.on then return end
+	-- exterior light knobs (clicks): the jet's own light keys, pressed by the export
+	if command == EXTLT_CMD.FORM or command == EXTLT_CMD.POS then
+		if (value or 0) > 0 then to_export("F15SITK," .. (command == EXTLT_CMD.FORM and "acol_lt" or "nav_lt")) end
+		return
+	end
+	-- front radio panel / IFF clicks
+	if command >= RFP_CMD.CHAN_UP and command <= RFP_CMD.IP then rfp_command(command, value); return end
+	-- SRS volume binds (UHF-1 / UHF-2 up / down)
+	if command >= RAD_BIND.V1_UP and command <= RAD_BIND.V2_DN then
+		if (value or 0) > 0 then
+			rad_vol((command <= RAD_BIND.V1_DN) and 1 or 2, (command == RAD_BIND.V1_UP or command == RAD_BIND.V2_UP) and 1 or -1)
+		end
+		return
+	end
 	if command >= 3101 and command <= 3199 then
 		local HS = SIT_HOTAS
 		local page_fn = command == HS.CASTLE_UP or command == HS.CASTLE_DOWN or command == HS.CASTLE_LEFT or
@@ -1306,11 +1443,46 @@ end
 -- the route in use: the loaded cartridge's, else the mission's (MSN). The
 -- jet's active waypoint (mission route) also selects the cartridge's.
 local function route_now() return ST.loaded.route or feed.wpts end
-local function active_now()
+-- a cartridge route the jet also flies (Route Tool preset): every
+-- cartridge point has a jet waypoint within 1 NM. map: jet index -> cartridge index
+local LINK = {r = nil, w = nil, map = nil}
+local function route_link()
+	local r, w = ST.loaded.route, feed.wpts
+	if not r then return nil end
+	if LINK.r == r and LINK.w == w then return LINK.map end
+	local map, hit = {}, 0
+	for i, p in ipairs(r) do
+		for j, q in ipairs(w or {}) do
+			if not map[j] and (p.x - q.x) ^ 2 + (p.z - q.z) ^ 2 < 1852 * 1852 then map[j] = i; hit = hit + 1; break end
+		end
+	end
+	LINK.r, LINK.w, LINK.map = r, w, (#r > 0 and hit == #r) and map or nil
+	return LINK.map
+end
+-- the jet's active waypoint on the route the SIT shows
+local function jet_active()
 	local r = route_now()
 	local a = feed.active or 0
-	if r ~= feed.wpts and a > #r then a = #r end
-	return a
+	if r == feed.wpts then return a end
+	local map = route_link()
+	if map then return map[a] or 0 end
+	return math.max(math.min(a, #r), #r > 0 and 1 or 0)
+end
+-- the SIT's active steerpoint: the jet's until WP+ / WP- (SIT page L1 / L2)
+-- is pressed, then the SIT's own (the jet's waypoint is not touched);
+-- back to the jet's when a cartridge (or MSN) is read
+function active_now()
+	local r = route_now()
+	if not ST.sit_act then return jet_active() end
+	if ST.sit_act > #r then ST.sit_act = #r end
+	return ST.sit_act
+end
+function wp_step(dir)
+	local r = route_now()
+	if #r == 0 then return end
+	local a = active_now()
+	if a < 1 then a = (dir > 0) and 0 or 1 end
+	ST.sit_act = (a - 1 + dir) % #r + 1
 end
 local ACT = {0, 0}
 local function draw_route()
@@ -1867,10 +2039,137 @@ function srs_set(r, f)
 	ST.rad_sent[r] = f
 	if (ST.rad_n or 0) < 10 then ST.rad_n = (ST.rad_n or 0) + 1; log(string.format("SRS: radio %d -> %.3f", r, f)) end
 end
+-- volume: SRS SET_VOLUME (command 5, 0..1) for radio r. SRS does not report
+-- its volume back: the page shows the last value sent from here.
+local function srs_vol(r)
+	if not udp then return end
+	local msg = string.format('{"RadioId":%d,"Volume":%.2f,"Command":5}', r, ST.vol[r] / 100)
+	pcall(function() udp:sendto(msg, "127.0.0.1", SIT.SRS_PORT) end)
+	if (ST.rad_n or 0) < 10 then ST.rad_n = (ST.rad_n or 0) + 1; log(string.format("SRS: radio %d volume %d%%", r, ST.vol[r])) end
+end
+function rad_vol(r, dir)
+	ST.vol[r] = math.max(0, math.min(100, ST.vol[r] + dir * (SIT.SRS_VOL_STEP or 5)))
+	srs_vol(r)
+end
+-- start volume: sent a few seconds after the cockpit starts (SRS connected by then)
+local VOL_T = {sent = false, t0 = nil}
+-----------------------------------------------------------------------
+-- v1.1: front UHF-1 radio panel (centre panel) and IFF MODE 3/A
+-- UHF-1 mode (the panel's mode knob): 1 CHAN (the preset), 2 MAN (the
+-- frequency knobs), 3 GUARD (243.000). IFF mode 3/A code: four octal
+-- wheels, sent to SRS (TRANSPONDER_M3_CODE; SRS uses it when its IFF is
+-- run from the overlay, as for FC3 aircraft); I/P = IDENT for 18 s.
+-- Code and manual frequency kept in Saved Games\DCS\Config\F15SIT_rfp.txt
+-----------------------------------------------------------------------
+local RFP_FILE = "Config/F15SIT_rfp.txt"
+local RFP = {ident_t = nil, loaded = false}
+local function rfp_path()
+	local ok, l = pcall(require, "lfs")
+	return ok and l and (l.writedir() .. RFP_FILE) or nil
+end
+local function rfp_load()
+	RFP.loaded = true
+	ST.r1_mode, ST.r1_man, ST.m3 = ST.r1_mode or 1, ST.r1_man or 251.0, ST.m3 or {1, 2, 0, 0}
+	local fn = rfp_path()
+	local f = fn and io.open(fn, "r")
+	if not f then return end
+	for raw in f:lines() do
+		local k, v = raw:match("^(%w+)=([%d%.]+)")
+		if k == "M3" and #v == 4 then for i = 1, 4 do ST.m3[i] = math.min(7, tonumber(v:sub(i, i)) or 0) end
+		elseif k == "MAN" and tonumber(v) then ST.r1_man = tonumber(v) end
+	end
+	f:close()
+end
+local function rfp_save()
+	local fn = rfp_path()
+	local f = fn and io.open(fn, "w")
+	if not f then return end
+	f:write("M3=" .. table.concat(ST.m3) .. "\nMAN=" .. string.format("%.3f", ST.r1_man) .. "\n")
+	f:close()
+end
+local function srs_cmd(json)
+	if not udp then return end
+	pcall(function() udp:sendto(json, "127.0.0.1", SIT.SRS_PORT) end)
+	if (ST.rad_n or 0) < 20 then ST.rad_n = (ST.rad_n or 0) + 1; log("SRS: " .. json) end
+end
+local function iff_send_m3()
+	srs_cmd(string.format('{"Command":8,"Code":%d}', tonumber(table.concat(ST.m3)) or 0))
+end
+-- the frequency UHF-1 is on, by its mode
+function rfp_freq()
+	if not RFP.loaded then rfp_load() end
+	if ST.r1_mode == 3 then return 243.0 end
+	if ST.r1_mode == 2 then return ST.r1_man end
+	local c = rad_list(1)[ST.rch[1]]
+	return c and c.f or nil
+end
+function preset_tune(r, f)
+	if r == 1 and (ST.r1_mode or 1) ~= 1 then return end    -- (UHF-1 on MAN / GUARD: the preset waits)
+	srs_set(r, f)
+end
+local function man_step(df)
+	if ST.r1_mode ~= 2 then ST.r1_man = rfp_freq() or ST.r1_man; ST.r1_mode = 2 end
+	local f = ST.r1_man + df
+	if f > 399.9875 then f = f - 175 elseif f < 224.9875 then f = f + 175 end
+	ST.r1_man = floor(f / 0.025 + 0.5) * 0.025
+	srs_set(1, ST.r1_man)
+	rfp_save()
+end
+-- a click on the panel (pressed: value > 0)
+function rfp_command(cmd, value)
+	if (value or 0) <= 0 then return end
+	if not RFP.loaded then rfp_load() end
+	local C = RFP_CMD
+	if cmd == C.CHAN_UP or cmd == C.CHAN_DN then rad_step(1, cmd == C.CHAN_UP and 1 or -1)
+	elseif cmd == C.F1_UP or cmd == C.F1_DN then man_step(cmd == C.F1_UP and 10 or -10)
+	elseif cmd == C.F2_UP or cmd == C.F2_DN then man_step(cmd == C.F2_UP and 1 or -1)
+	elseif cmd == C.F3_UP or cmd == C.F3_DN then man_step(cmd == C.F3_UP and 0.025 or -0.025)
+	elseif cmd == C.VOL_UP or cmd == C.VOL_DN then rad_vol(1, cmd == C.VOL_UP and 1 or -1)
+	elseif cmd == C.MODE_CW or cmd == C.MODE_CCW then
+		local m = math.max(1, math.min(3, ST.r1_mode + (cmd == C.MODE_CW and 1 or -1)))
+		if m ~= ST.r1_mode then
+			ST.r1_mode = m
+			local f = rfp_freq()
+			if f then srs_set(1, f) end
+		end
+	elseif cmd == C.IP then
+		srs_cmd('{"Command":10,"Enabled":true}')
+		RFP.ident_t = now()
+	else
+		for k = 1, 4 do
+			if cmd == C["W" .. k .. "_UP"] or cmd == C["W" .. k .. "_DN"] then
+				ST.m3[k] = (ST.m3[k] + (cmd == C["W" .. k .. "_UP"] and 1 or -1)) % 8
+				iff_send_m3()
+				rfp_save()
+			end
+		end
+	end
+end
+-- the drums: CHAN, MAIN FREQ, MODE 3/A (numbers; -1 = blank)
+local HR = {ch = {P("RFP_CH1"), P("RFP_CH2")}, f = {}, m = {}}
+for k = 1, 6 do HR.f[k] = P("RFP_F" .. k) end
+for k = 1, 4 do HR.m[k] = P("RFP_M" .. k) end
+local function rfp_draw()
+	if not RFP.loaded then rfp_load() end
+	local ch = ST.rch[1] or 1
+	HR.ch[1]:set(floor(ch / 10)); HR.ch[2]:set(ch % 10)
+	local f = rfp_freq()
+	local s = f and string.format("%07.3f", f) or nil
+	local idx = {1, 2, 3, 5, 6, 7}
+	for k = 1, 6 do HR.f[k]:set(s and (tonumber(s:sub(idx[k], idx[k])) or 0) or -1) end
+	for k = 1, 4 do HR.m[k]:set(ST.m3[k]) end
+end
+function srs_vol_tick(t)
+	if RFP.ident_t and t - RFP.ident_t > 18 then RFP.ident_t = nil; srs_cmd('{"Command":10,"Enabled":false}') end
+	rfp_draw()
+	if VOL_T.sent then return end
+	VOL_T.t0 = VOL_T.t0 or t
+	if t - VOL_T.t0 >= 3 then VOL_T.sent = true; srs_vol(1); srs_vol(2); if not RFP.loaded then rfp_load() end; iff_send_m3() end
+end
 function rad_step(r, dir)
 	ST.rch[r] = (ST.rch[r] - 1 + dir) % 20 + 1
 	local c = rad_list(r)[ST.rch[r]]
-	if c then srs_set(r, c.f) end
+	if c then preset_tune(r, c.f) end
 end
 function rad_edit_key(k)
 	local e = ST.redit
@@ -1886,7 +2185,7 @@ function rad_edit_key(k)
 		if not f or f < RAD_MIN or f > RAD_MAX then e.msg = "OUT OF RANGE 225-399.975"; return end
 		local list = rad_own(e.r)
 		list[e.ch] = {f = f, n = (list[e.ch] and list[e.ch].n) or ""}
-		if ST.rch[e.r] == e.ch then srs_set(e.r, f) end
+		if ST.rch[e.r] == e.ch then preset_tune(e.r, f) end
 		ST.redit = nil
 	end
 end
@@ -1903,8 +2202,13 @@ local function page_radio()
 			H.rad[r][k]:set(c and string.format("%02d %7.3f %s", k, c.f, (c.n or ""):upper():sub(1, 8)) or string.format("%02d   -.---", k))
 		end
 		H.rad_act[r]:set(ST.rch[r])
+		H.rad_vol[r]:set(string.format("VOL %d", ST.vol[r]))
 		local c = list[ST.rch[r]]
-		H.rad_cur[r]:set(c and string.format("CH%02d %7.3f", ST.rch[r], c.f) or string.format("CH%02d  NONE", ST.rch[r]))
+		if r == 1 and (ST.r1_mode or 1) ~= 1 then
+			H.rad_cur[r]:set(string.format("%s %7.3f", ST.r1_mode == 2 and "MAN  " or "GUARD", rfp_freq()))
+		else
+			H.rad_cur[r]:set(c and string.format("CH%02d %7.3f", ST.rch[r], c.f) or string.format("CH%02d  NONE", ST.rch[r]))
+		end
 	end
 	local e = ST.redit
 	H.rad_edit:set(e and e.r or 0)
@@ -1957,31 +2261,51 @@ local function page_own()
 end
 
 local function page_flt()
-	-- L1..L5: friendly aircraft to pick (boxed = flight member)
+	local sl, sel = slots_now(), ST.fsel
+	-- L1..L5: friendly aircraft, their slot number in front, boxed = picked
 	local cand = flt_candidates()
 	local pages = math.max(1, math.ceil(#cand / 5))
 	if ST.flt_page >= pages then ST.flt_page = pages - 1 end
 	for k = 1, 5 do
 		local a = cand[ST.flt_page * 5 + k]
-		H.fc[k].txt:set(a and safe_text(a.unit:sub(1, 14) .. (a.human and "*" or "")) or "")
-		H.fc[k].on:set((a and ST.flt[a.unit]) and 1 or 0)
+		local n = a and slot_of(a.unit)
+		H.fc[k].txt:set(a and safe_text((n and tostring(n) or "-") .. " " .. a.unit:sub(1, 13) .. (a.human and "*" or "")) or "")
+		H.fc[k].on:set((a and sel and sel.c == a.unit) and 1 or 0)
 	end
-	H.fc_pg:set(safe_text(string.format("PAGE %d/%d", ST.flt_page + 1, pages)))
-	-- members: number, unit, bearing / range, altitude, ground speed
-	local m = flt_members()
-	H.flt[1]:set("#  BRG/RNG  ALT  GS")
-	for k = 1, 3 do
-		local a = m[k]
-		if a then
-			local b, r = brg_rng(a.x - G.ox, a.z - G.oz)
-			local gs = sqrt(a.vx * a.vx + a.vz * a.vz) * 1.94384
-			H.flt[2 * k]:set(safe_text(string.format("%d  %s", a.num, a.unit:sub(1, 16))))
-			H.flt[2 * k + 1]:set(string.format("   %03d/%-3d %2dK %3d", b, floor(r / NM + 0.5), floor(a.y / FT / 1000 + 0.5), floor(gs + 0.5)))
+	H.fc_pg:set(#cand == 0 and "NO FRIENDLIES" or safe_text(string.format("PAGE %d/%d", ST.flt_page + 1, pages)))
+	-- R1..R4: the slots
+	for k = 1, 4 do
+		local v, h = sl[k], H.fs[k]
+		h.own:set(v == "OWN" and 1 or 0)
+		h.sel:set((sel and sel.s == k) and 1 or 0)
+		h.empty:set(v and 0 or 1)
+		if v == "OWN" then
+			local nm = own_name()
+			h.n:set(safe_text(nm ~= "" and nm:sub(1, 18) or "OWNSHIP"))
+			local alt, ias = sd_val("getBarometricAltitude"), sd_val("getIndicatedAirSpeed")
+			h.d:set(safe_text("OWNSHIP   " .. (alt and string.format("%dK", floor(alt / FT / 1000 + 0.5)) or "") ..
+				(ias and string.format("   %d KIAS", floor(ias * 1.94384 + 0.5)) or "")))
+		elseif v then
+			h.n:set(safe_text(v:sub(1, 18)))
+			local a = flt_find(v)
+			if a then
+				local b, r = brg_rng(a.x - G.ox, a.z - G.oz)
+				local gs = sqrt(a.vx * a.vx + a.vz * a.vz) * 1.94384
+				h.d:set(safe_text(string.format("%03d/%d NM   %dK   %d KT", b, floor(r / NM + 0.5), floor(a.y / FT / 1000 + 0.5), floor(gs + 0.5))))
+			else
+				h.d:set("NOT ON THE DATALINK")
+			end
 		else
-			H.flt[2 * k]:set((k == 1 and #m == 0) and "NO FLIGHT MEMBERS" or "")
-			H.flt[2 * k + 1]:set("")
+			h.n:set("EMPTY"); h.d:set("")
 		end
 	end
+	H.fmode:set(ST.slot_man and 0 or 1)
+	local hint
+	if sel and sel.c then hint = safe_text(sel.c:sub(1, 14) .. ": PRESS A SLOT")
+	elseif sel and sel.s then hint = "SLOT " .. sel.s .. ": SLOT OR AIRCRAFT, CLR"
+	elseif ST.fhint and now() - (ST.fhint_t or -10) < 3 then hint = ST.fhint
+	else hint = "PICK AN AIRCRAFT, THEN A SLOT" end
+	H.fhint:set(hint)
 end
 
 local function draw_pages(t, stale)
@@ -2039,7 +2363,7 @@ init_texts()        -- at load already, before the first frame
 
 function post_initialize()
 	init_texts()
-	log("=== F-15C SIT 1.1, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
+	log("=== F-15C SIT 1.2, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
 	for name, cmd in pairs(SIT_CMD) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_HOTAS) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_PANEL) do dev:listen_command(cmd) end
@@ -2052,6 +2376,9 @@ function post_initialize()
 	for _, cmd in pairs(ACQ_BIND) do dev:listen_command(cmd) end    -- auto acq switch, helmet acquisition
 	for _, cmd in pairs(WPN_BIND) do dev:listen_command(cmd) end    -- weapon select switch, missile reject
 	for _, cmd in pairs(TGT_BIND) do dev:listen_command(cmd) end    -- target step, unlock
+	for _, cmd in pairs(RAD_BIND) do dev:listen_command(cmd) end    -- SRS volume
+	for _, cmd in pairs(RFP_CMD) do dev:listen_command(cmd) end     -- front radio panel, IFF
+	for _, cmd in pairs(EXTLT_CMD) do dev:listen_command(cmd) end   -- exterior light knobs
 	-- the jet's radar slew commands (numbers from Logs\f15sit_icmd.lua, written
 	-- by the add-on's block in the F-15C's controls file): do they reach us?
 	pcall(function()
@@ -2427,6 +2754,7 @@ local function update_body()
 	local t = now()
 	hmd_controls_tick(t)
 	acq_tick(t)
+	srs_vol_tick(t)
 	local sd = sensors()
 	if not sd then return end
 

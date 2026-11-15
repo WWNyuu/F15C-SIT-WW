@@ -1,5 +1,5 @@
 -----------------------------------------------
--- F-15C SIT (WW) 1.1
+-- F-15C SIT (WW) 1.2
 -- Bolt-on SIT display for the Flaming Cliffs F-15C.
 -- Hooks into the F-15C the same way KRN MODS' MiG-29A(M)
 -- Cockpit Modernization hooks into the MiG-29: add_plugin_systems().
@@ -12,7 +12,7 @@ declare_plugin("f15c_sit",
 	displayName      = _("F-15C SIT (WW)"),
 	shortName        = "f15c_sit",
 	fileMenuName     = "f15c_sit",
-	version = "1.1.0",
+	version = "1.2.0",
 	state            = "installed",
 	developerName    = "nyuu",
 	info             = "SIT page and JHMCS for the Flaming Cliffs F-15C",

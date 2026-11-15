@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.1
+-- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.2
 --
 -- Based on MiG29DL_Export.lua of the Vitezovi MiG-29 MFD add-on, with the
 -- SAME picture rules (own radar always; friendlies and the hostiles that a
@@ -1338,6 +1338,12 @@ local function cmds_tick(t)
 					dbg(on and "SIT page on screen: world scan on" or "SIT page off screen: world scan paused")
 				end
 				PIC.need, PIC.t = on, t
+			elseif m:sub(1, 7) == "F15SITK" then
+				-- the device: press one of the jet's keys by name (Logs\f15sit_icmd.lua),
+				-- e.g. the exterior light knobs: nav_lt, acol_lt
+				local k = m:match("^F15SITK,([%w_]+)")
+				local cmd = c and k and tonumber(c[k])
+				if cmd and LoSetCommand then LoSetCommand(cmd); dbg("key " .. k) end
 			elseif m:sub(1, 7) == "F15SITU" then
 				-- the device: press this key once (undoes a radar zoom key that
 				-- went to the SIT range instead)

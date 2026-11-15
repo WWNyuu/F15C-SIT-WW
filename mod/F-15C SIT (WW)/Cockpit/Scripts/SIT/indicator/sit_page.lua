@@ -740,6 +740,8 @@ side_label("R", 3, "AUTO", nil, {"F15SIT_AUTOR", 0.5, 1.5})
 side_label("R", 3, "MAN", nil, {"F15SIT_AUTOR", -0.5, 0.5})
 side_label("R", 5, "MENU")
 side_label("L", 5, "SET")                -- left 5: SIT SETTINGS (left 5 there comes back)
+side_label("L", 1, "WP+")                -- left 1 / 2: steerpoint next / previous
+side_label("L", 2, "WP-")
 -- declutter step: shown for a moment after it changes
 simple("sit_dclp", "sit_pg", {0, 0, 0}, {"F15SIT_DCL_POP"}, {vis(0, 0.5, 1.5)})
 text("sit_dclp_t", "sit_dclp", {0, 0.70, 0}, F.cfriend, TXT_SMALL, "CenterCenter", nil, "F15SIT_DCL_TXT")
@@ -1000,20 +1002,49 @@ title("od", "OWN DATA")
 rows("od", "OWN", 11, -0.58, 0.50, 0.085)
 R("od", 5, {"M"})
 
--- FLIGHT DATA: L1..L5 = friendly aircraft to pick as flight members (boxed
--- = member, * = player), UP / DN = more of them; right: the members
+-- FLIGHT DATA (v1.1): left the friendly aircraft (L1..L5, slot number in
+-- front, boxed = picked), right the flight as four cards on R1..R4 (the
+-- ownship's card green); UP / DN page the list, CLR empties a slot, AUTO
+-- (boxed while on) orders the own group by name
 page_group("fd", SIT.PG.FLT)
-title("fd", "FLIGHT DATA")
-for k = 1, 5 do
-	local nm = "fd_c" .. k
-	text(nm, "fd", {-SX, Y5[k], 0}, F.white, TXT_TINY, "LeftCenter", nil, "F15SIT_FC" .. k .. "_TXT")
-	box_in("fd", nm .. "_box", -SX - PAD, Y5[k] - CHT / 2 - PAD, -SX + 15 * CWT + PAD, Y5[k] + CHT / 2 + PAD,
-		"F15SIT_FC" .. k .. "_ON")
+title("fd", "FLIGHT DATA", 0.75)
+do
+	local XL, XD = -SX, -0.33           -- list, divider
+	local X0, X1 = -0.27, 0.70          -- cards
+	local CH2 = 0.105                   -- card half height
+	text("fd_hl", "fd", {XL, 0.695, 0}, F.grey, TXT_TINY, "LeftCenter", "DATALINK")
+	text("fd_hr", "fd", {X0, 0.695, 0}, F.grey, TXT_TINY, "LeftCenter", "FLIGHT")
+	v, i = poly_lines({{XD, 0.70}, {XD, -0.66}}, false)
+	mesh("fd_div", "fd", "lines", v, i, M.planf)
+	for k = 1, 5 do
+		local nm = "fd_c" .. k
+		text(nm, "fd", {XL, Y5[k], 0}, F.white, TXT_TINY, "LeftCenter", nil, "F15SIT_FC" .. k .. "_TXT")
+		box_in("fd", nm .. "_box", XL - PAD, Y5[k] - CHT / 2 - PAD, XL + 16 * CWT + PAD, Y5[k] + CHT / 2 + PAD,
+			"F15SIT_FC" .. k .. "_ON", M.cyan)
+	end
+	text("fd_pg", "fd", {XL, -0.70, 0}, F.grey, TXT_TINY, "LeftCenter", nil, "F15SIT_FC_PG_TXT")
+	for k = 1, 4 do
+		local y, p = Y5[k], "F15SIT_FS" .. k .. "_"
+		-- card frame (grey), picked: a second, cyan frame just outside it
+		v, i = poly_lines({{X0, y + CH2}, {X1, y + CH2}, {X1, y - CH2}, {X0, y - CH2}}, true)
+		mesh("fd_s" .. k .. "_f", "fd", "lines", v, i, M.planf)
+		box_in("fd", "fd_s" .. k .. "_sel", X0 - 0.012, y - CH2 - 0.012, X1 + 0.012, y + CH2 + 0.012, p .. "SEL", M.cyan)
+		-- slot number, big, left in the card
+		text("fd_s" .. k .. "_no", "fd", {X0 + 0.035, y, 0}, F.cyan, TXT, "LeftCenter", tostring(k))
+		-- name: white, green for the ownship, grey when empty
+		text("fd_s" .. k .. "_n", "fd", {X0 + 0.13, y + 0.035, 0}, F.white, TXT_SMALL, "LeftCenter", nil, p .. "N_TXT", {p .. "OWN", -0.5, 0.5})
+		text("fd_s" .. k .. "_no2", "fd", {X0 + 0.13, y + 0.035, 0}, F.cfriend, TXT_SMALL, "LeftCenter", nil, p .. "N_TXT", {p .. "OWN", 0.5, 1.5})
+		text("fd_s" .. k .. "_d", "fd", {X0 + 0.13, y - 0.045, 0}, F.cyan, TXT_TINY, "LeftCenter", nil, p .. "D_TXT")
+		-- ownship tag
+		text("fd_s" .. k .. "_ot", "fd", {X1 - 0.02, y + 0.035, 0}, F.cfriend, TXT_TINY, "RightCenter", "OWN", nil, {p .. "OWN", 0.5, 1.5})
+		R("fd", k, {tostring(k)})
+	end
+	text("fd_hint", "fd", {(X0 + X1) / 2, -0.47, 0}, F.yellow, TXT_TINY, "CenterCenter", nil, "F15SIT_FLT_HINT_TXT")
 end
-rows("fd", "FLT", 7, 0.0, 0.46, 0.085, TXT_TINY, F.cyan)
 B("fd", 2, {"UP"})
+B("fd", 3, {"CLR"})
 B("fd", 4, {"DN"})
-text("fd_pg", "fd", {0, -0.775, 0}, F.white, TXT_TINY, "CenterCenter", nil, "F15SIT_FC_PG_TXT")
+B("fd", 5, {"AUTO"}, "F15SIT_FLT_AUTO")
 R("fd", 5, {"M"})
 
 -- WPN (A/G weapon video) ---------------------------------------------------
@@ -1043,6 +1074,8 @@ text("ss_n5", "ss", {0, -0.24, 0}, F.white, TXT_TINY, "CenterCenter", "RANGE: SL
 page_group("rd", SIT.PG.RADIO)
 L("rd", 1, {"UP"}); L("rd", 2, {"DN"})
 R("rd", 1, {"UP"}); R("rd", 2, {"DN"})
+L("rd", 3, {"VOL", "+"}); L("rd", 4, {"VOL", "-"})
+R("rd", 3, {"VOL", "+"}); R("rd", 4, {"VOL", "-"})
 R("rd", 5, {"M"})
 T("rd", 1, {"EDIT", "1"}, {"F15SIT_RAD_EDIT", 0.5, 1.5})
 T("rd", 5, {"EDIT", "2"}, {"F15SIT_RAD_EDIT", 1.5, 2.5})
@@ -1055,6 +1088,7 @@ do
 		local x = XC[r]
 		text("rd_h" .. r, "rd", {x, 0.60, 0}, F.white, TXT_SMALL, "LeftCenter", (r == 1) and "UHF-1 MSN" or "UHF-2 FLT")
 		text("rd_c" .. r, "rd", {x, 0.53, 0}, F.cyan, TXT_SMALL, "LeftCenter", nil, "F15SIT_RAD" .. r .. "_CUR_TXT")
+		text("rd_v" .. r, "rd", {x + 0.36, 0.60, 0}, F.cyan, TXT_DATA, "LeftCenter", nil, "F15SIT_RAD" .. r .. "_VOL_TXT")
 		for k = 1, 20 do
 			local y = 0.44 - (k - 1) * 0.052
 			text("rd_r" .. r .. "_" .. k, "rd", {x, y, 0}, F.white, TXT_DATA, "LeftCenter", nil, "F15SIT_RAD" .. r .. "_" .. k .. "_TXT")

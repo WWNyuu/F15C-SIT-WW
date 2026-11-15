@@ -12,6 +12,7 @@
 -- v0.8: the mission drawings of the player's side and the Common layer
 -- (lines, polygons, circles, rectangles; MSN cartridge, LINES on SIT):
 --   F15SITL,<version>\nA,name,x,z,x,z...\nL,name,x,z...   (A closed, L open)
+-- v1.1: cartridge routes as Route Tool presets (see sync_route_presets)
 -- Log: Saved Games\DCS\Logs\f15sit_hook.log
 -----------------------------------------------------------------------
 local F15SIT_hook = {}
@@ -201,6 +202,190 @@ local function read_drawings()
 	if not ok then log("drawings: " .. tostring(err)) end
 end
 
+-----------------------------------------------------------------------
+-- v1.1: cartridge routes as Route Tool presets. FC3 jets take their route
+-- from the mission at spawn only; DCS's Route Tool (F10 map, before you
+-- spawn) can set it. Every F-15C cartridge in Saved Games\DCS\DTC\F-15C
+-- becomes a preset "F-15C DTC: <name>" in
+-- Saved Games\DCS\Config\RouteToolPresets\<map>.lua (the other presets in
+-- that file are kept; a deleted cartridge's preset goes). Pick it in the
+-- Route Tool and tick USE THIS ROUTE ON NEXT SPAWN: the jet, its HUD
+-- steering and the SIT page then fly the cartridge route.
+-- Done when DCS starts, when a mission loads and when it ends.
+-----------------------------------------------------------------------
+local RT_PREFIX = "F-15C DTC: "
+local RT_SPEED = 220       -- m/s for the ETAs (the Route Tool shows them)
+local function rt_json(txt)
+	if net and net.json2lua then
+		local ok, d = pcall(net.json2lua, txt)
+		if ok and type(d) == "table" then return d end
+	end
+	local f = loadfile("Scripts/JSON.lua")
+	if f then
+		local ok, J = pcall(f)
+		if ok and J then
+			local ok2, d = pcall(function() return J:decode(txt) end)
+			if ok2 and type(d) == "table" then return d end
+		end
+	end
+	return nil
+end
+-- lat / lon -> map metres through DCS's terrain (only for the loaded map)
+local function rt_terrain()
+	local ok, t = pcall(require, "terrain")
+	if ok and type(t) == "table" and t.convertLatLonToMeters then return t end
+	if type(Terrain) == "table" and Terrain.convertLatLonToMeters then return Terrain end
+	return nil
+end
+local SAME_MAP = {germanycoldwar = "germanycw", sinai = "sinaimap", marianaswwii = "marianaislandswwii"}
+local function map_id(n) n = tostring(n or ""):lower(); return SAME_MAP[n] or n end
+local function rt_val(v)
+	if type(v) == "number" then
+		if v == math.floor(v) and math.abs(v) < 1e9 then return string.format("%d", v) end
+		return string.format("%.15g", v)
+	elseif type(v) == "boolean" then return tostring(v) end
+	return string.format("%q", tostring(v))
+end
+-- the presets file, as DCS writes it
+local PT_KEYS = {"alt", "type", "ETA", "ETA_locked", "y", "x", "name", "action", "alt_type", "speed", "speed_locked"}
+local function rt_write(presets)
+	local names = {}
+	for k in pairs(presets) do names[#names + 1] = k end
+	table.sort(names)
+	local o = {"presets = \n{\n"}
+	for _, n in ipairs(names) do
+		o[#o + 1] = "\t[" .. string.format("%q", n) .. "] = \n\t{\n"
+		for i, pt in ipairs(presets[n]) do
+			o[#o + 1] = "\t\t[" .. i .. "] = \n\t\t{\n"
+			local seen = {}
+			for _, k in ipairs(PT_KEYS) do
+				if pt[k] ~= nil then o[#o + 1] = "\t\t\t[\"" .. k .. "\"] = " .. rt_val(pt[k]) .. ",\n"; seen[k] = true end
+			end
+			for k, v in pairs(pt) do
+				if not seen[k] and type(k) == "string" and type(v) ~= "table" then o[#o + 1] = "\t\t\t[" .. string.format("%q", k) .. "] = " .. rt_val(v) .. ",\n" end
+			end
+			o[#o + 1] = "\t\t}, -- end of [" .. i .. "]\n"
+		end
+		o[#o + 1] = "\t}, -- end of [" .. string.format("%q", n) .. "]\n"
+	end
+	o[#o + 1] = "} -- end of presets\n"
+	return table.concat(o)
+end
+-- cartridge -> preset points (nil: no route / no coordinates)
+local function rt_points(d, terr)
+	if type(d.route) ~= "table" then return nil end
+	local pts, eta, px, py = {}, 0, nil, nil
+	for i, p in ipairs(d.route) do
+		if type(p) ~= "table" then return nil end
+		local x, y = tonumber(p.x), tonumber(p.y)
+		if terr and tonumber(p.lat) and tonumber(p.lon) then
+			local ok, tx, ty = pcall(terr.convertLatLonToMeters, tonumber(p.lat), tonumber(p.lon))
+			if ok and type(tx) == "number" and tx == tx and type(ty) == "number" and ty == ty then x, y = tx, ty end
+		end
+		if not x or not y then return nil end
+		if px then eta = eta + math.sqrt((x - px) ^ 2 + (y - py) ^ 2) / RT_SPEED end
+		px, py = x, y
+		local nm = tostring(p.name or ""):gsub("[^%w%-%./ ]", ""):sub(1, 16)
+		pts[#pts + 1] = {alt = math.floor((tonumber(p.alt) or 0) * 0.3048 + 0.5), type = "Turning Point", ETA = math.floor(eta + 0.5),
+			ETA_locked = false, y = y, x = x, name = (nm ~= "" and nm or ("STPT " .. i)), action = "Turning Point",
+			alt_type = "BARO", speed = RT_SPEED, speed_locked = false}
+	end
+	return #pts > 0 and pts or nil
+end
+-- theatre_now: the loaded mission's map (its cartridges converted with the
+-- terrain); others use the x / y the DTM Planner stores in the cartridge
+local function sync_route_presets(theatre_now)
+	local ok, err = pcall(function()
+		local l = require("lfs")
+		local dtc_dir = l.writedir() .. "DTC/F-15C/"
+		local by_map, maps_seen, n_cart = {}, {}, 0
+		local okd = pcall(function()
+			for f in l.dir(dtc_dir) do
+				if type(f) == "string" and f:lower():match("%.dtc$") then
+					local fh = io.open(dtc_dir .. f, "r")
+					local txt = fh and fh:read("*a") or ""
+					if fh then fh:close() end
+					if txt:sub(1, 3) == "\239\187\191" then txt = txt:sub(4) end
+					local d = txt:find("F-15C", 1, true) and rt_json(txt)
+					if d and tostring(d.type or ""):find("F%-15C") and type(d.terrain) == "string" and d.terrain ~= "" then
+						local here = theatre_now and map_id(d.terrain) == map_id(theatre_now)
+						local pts = rt_points(d, here and rt_terrain() or nil)
+						local file_map = here and theatre_now or d.terrain
+						maps_seen[file_map] = true
+						if pts then
+							by_map[file_map] = by_map[file_map] or {}
+							by_map[file_map][RT_PREFIX .. f:gsub("%.[dD][tT][cC]$", "")] = pts
+							n_cart = n_cart + 1
+						end
+					end
+				end
+			end
+		end)
+		if not okd then return end   -- no DTC folder
+		local rt_dir = l.writedir() .. "Config/RouteToolPresets/"
+		pcall(l.mkdir, rt_dir)
+		-- also clean maps whose cartridges were all deleted: any presets file with ours in it
+		pcall(function()
+			for f in l.dir(rt_dir) do
+				if type(f) == "string" and f:match("%.lua$") then maps_seen[f:sub(1, -5)] = maps_seen[f:sub(1, -5)] or false end
+			end
+		end)
+		local n_files = 0
+		for map, _ in pairs(maps_seen) do
+			local path = rt_dir .. map .. ".lua"
+			local presets, old_txt = {}, nil
+			local fh = io.open(path, "r")
+			if fh then old_txt = fh:read("*a"); fh:close() end
+			if old_txt then
+				local f = loadstring(old_txt)
+				if not f then log("route presets: " .. map .. ".lua not readable, left alone"); presets = nil
+				else
+					local env = {}
+					setfenv(f, env)
+					if pcall(f) and type(env.presets) == "table" then presets = env.presets end
+				end
+			end
+			if presets then
+				local had_ours = false
+				for k in pairs(presets) do
+					if type(k) == "string" and k:sub(1, #RT_PREFIX) == RT_PREFIX then presets[k] = nil; had_ours = true end
+				end
+				local add = by_map[map] or {}
+				for k, v in pairs(add) do presets[k] = v end
+				if next(add) or had_ours then
+					local new_txt = rt_write(presets)
+					if new_txt ~= old_txt then
+						-- the user's own file, once, before the add-on first changes it
+						if old_txt and not had_ours then
+							local b = io.open(path .. ".f15sit-backup", "r")
+							if b then b:close() else
+								b = io.open(path .. ".f15sit-backup", "w")
+								if b then b:write(old_txt); b:close() end
+							end
+						end
+						local w = io.open(path, "w")
+						if w then w:write(new_txt); w:close(); n_files = n_files + 1 end
+					end
+				end
+			end
+		end
+		log("route presets: " .. n_cart .. " cartridge route(s), " .. n_files .. " presets file(s) written" .. (theatre_now and (" (map " .. theatre_now .. ")") or ""))
+	end)
+	if not ok then log("route presets: " .. tostring(err)) end
+end
+local function mission_theatre()
+	local ok, t = pcall(function()
+		local m = DCS.getCurrentMission and DCS.getCurrentMission()
+		return m and m.mission and m.mission.theatre
+	end)
+	return ok and type(t) == "string" and t or nil
+end
+
+function F15SIT_hook.onMissionLoadEnd()
+	read_options()
+	if OPT.f15c_sit_enabled then sync_route_presets(mission_theatre()) end
+end
+
 function F15SIT_hook.onSimulationStart()
 	last = -100
 	read_options()
@@ -209,6 +394,7 @@ function F15SIT_hook.onSimulationStart()
 end
 
 function F15SIT_hook.onSimulationStop()
+	if OPT.f15c_sit_enabled then sync_route_presets(nil) end
 	msg, msg_d, msg_p, unit_seen, mission, msg_r, searched = nil, nil, nil, nil, nil, nil, false
 	msg_l, side_seen = nil, nil
 end
@@ -253,3 +439,5 @@ end
 
 DCS.setUserCallbacks(F15SIT_hook)
 log("loaded")
+read_options()
+if OPT.f15c_sit_enabled then sync_route_presets(nil) end

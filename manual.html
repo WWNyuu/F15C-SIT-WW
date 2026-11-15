@@ -201,14 +201,14 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
     <a href="./#pages">Pages</a>
     <a href="./#dtm">DTM Planner</a>
     <a href="manual.html" aria-current="page">Pilot manual</a>
-    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.1/F-15C.SIT.WW.1.1.zip">Download v1.1</a>
+    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.2/F-15C.SIT.WW.1.2.zip">Download v1.2</a>
   </nav>
 </div></header>
 <div class="wrap man">
-  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#jhmcs">JHMCS helmet display</a></li><li><a href="#radar-acquisition">Radar acquisition and weapon switches</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
+  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#radio-panel">Front radio panel, IFF and lights</a></li><li><a href="#jhmcs">JHMCS helmet display</a></li><li><a href="#radar-acquisition">Radar acquisition and weapon switches</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
   <article class="doc">
     <h1>F-15C SIT Pilot Manual</h1>
-    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.1: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C, the JHMCS helmet display and the radar acquisition switches on the HOTAS.</p>
+    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.2: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C, the JHMCS helmet display, the radar acquisition switches on the HOTAS, and the clickable front radio, IFF and exterior light controls.</p>
 <h2 id="before-you-fly">Before you fly</h2>
 
 <p>You need DCS World with the F-15C from Flaming Cliffs. Nothing else is required; <a href="https://github.com/ciribob/DCS-SimpleRadioStandalone">SRS</a> is used by the RADIO page if you have it.</p>
@@ -257,7 +257,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 
 <h2 id="sit-page">SIT page</h2>
 
-<figure class="fig"><div class="shot"><img src="img/p_sit_hook.jpg" alt="SIT page at 160 NM with the cursor on a contact" width="1000" height="1000" loading="lazy"></div><figcaption>SIT page at 160 NM, the cursor on a friendly F-15E</figcaption></figure><ol class="legend"><li>Top left: time (Zulu or local, set on TIME / DATE). With the cursor on a contact: its data block (identity and name, bearing / range, altitude in thousands of feet and speed, aspect).</li><li>Top right: the range in NM from your jet to the top of the SIT area; below it in cyan the cursor's bearing and range from you (no cursor: the active steerpoint).</li><li>Cyan lines: the edges of your radar's scan, out to its range scale.</li><li>Left: L5 SET opens SIT SETTINGS. Bottom left: the weapon inventory, e.g. <code>A4C M2MH S2M G9</code>: A AIM-120, M AIM-7, S AIM-9 with count and model (here 4 AIM-120C, 2 AIM-7MH, 2 AIM-9M), G gun rounds in hundreds. The selected weapon is boxed.</li><li>Right: R3 AUTO / MAN range, R5 MENU. Bottom right: chaff (C) and flares (F), the selected CMD program, RWR filter, ICS bands, the bullseye readout in yellow (the cursor from the bullseye) and the master mode.</li></ol>
+<figure class="fig"><div class="shot"><img src="img/p_sit_hook.jpg" alt="SIT page at 160 NM with the cursor on a contact" width="1000" height="1000" loading="lazy"></div><figcaption>SIT page at 160 NM, the cursor on a friendly F-15E</figcaption></figure><ol class="legend"><li>Top left: time (Zulu or local, set on TIME / DATE). With the cursor on a contact: its data block (identity and name, bearing / range, altitude in thousands of feet and speed, aspect).</li><li>Top right: the range in NM from your jet to the top of the SIT area; below it in cyan the cursor's bearing and range from you (no cursor: the active steerpoint).</li><li>Cyan lines: the edges of your radar's scan, out to its range scale.</li><li>Left: L1 WP+ / L2 WP&minus; step the SIT's highlighted steerpoint, L5 SET opens SIT SETTINGS. Bottom left: the weapon inventory, e.g. <code>A4C M2MH S2M G9</code>: A AIM-120, M AIM-7, S AIM-9 with count and model (here 4 AIM-120C, 2 AIM-7MH, 2 AIM-9M), G gun rounds in hundreds. The selected weapon is boxed.</li><li>Right: R3 AUTO / MAN range, R5 MENU. Bottom right: chaff (C) and flares (F), the selected CMD program, RWR filter, ICS bands, the bullseye readout in yellow (the cursor from the bullseye) and the master mode.</li></ol>
 <p><strong>Symbols</strong></p>
 <div class="tbl"><table><thead><tr><th>Symbol</th><th>Meaning</th></tr></thead><tbody>
 <tr><td>green circle</td><td>Friendly. Solid: on your radar; dotted: datalink only. A dot inside: AWACS (large circle) or a friendly datalink fighter.</td></tr>
@@ -284,6 +284,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <p>Normally the SIT page's cursor shows where the radar (VSD) cursor is. <strong>Castle up</strong> gives the cursor to the SIT page (it turns solid): the jet's TDC slew now moves it across the SIT page and the radar cursor stays where it is. Castle up again, or leaving the SIT page, gives it back to the radar. <code>SIT Cursor</code> keys and axes move it too.</p>
 <p>Put the cursor on a contact for its data block. <code>SIT Mark Point</code> drops a mark at the cursor (or under you without one); <code>SIT Delete Mark Point</code> removes the mark nearest the cursor, else the newest.</p>
 <figure class="fig"><div class="shot"><img src="img/p_sit_route.jpg" alt="SIT page at 40 NM with route, SA-11 ring and bullseye" width="1000" height="993" loading="lazy"></div><figcaption>40 NM: route to the active steerpoint, an SA-11 ring, the bullseye and flight member 3</figcaption></figure>
+<p><strong>Steerpoints:</strong> the SIT page highlights the jet's active waypoint. L1 WP+ / L2 WP&minus; step the SIT's own highlighted steerpoint instead (it wraps round at the ends); the jet's waypoint and the HUD steering do not change. The SIT follows the jet again after a READ on the DTM page.</p>
 <p><strong>Declutter</strong> (<code>SIT Declutter</code> keybind, or SIT SETTINGS R2) steps through FULL, NO LINES (no route, drawings, course line), NO DATA (no texts by the symbols), NO RINGS (no threat rings) and MIN (no radar scan lines). A short popup shows the step.</p>
 <p><strong>Where the picture comes from:</strong> your own radar every second; friendlies within 300 km; hostiles that a friendly AWACS, EWR, ship or datalink fighter could see, with their range, radar horizon and the terrain in between; enemy SAM sites once a friendly aircraft could pick up their radar. The AWACS picture is refreshed every 6 seconds and drawn where the contacts were, moved along their course. On servers that block this, see <a href="#datalink-and-servers">Datalink and servers</a>.</p>
 
@@ -325,9 +326,10 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <ul>
 <li>L1 UP / L2 DN step UHF-1, R1 UP / R2 DN step UHF-2. SRS tunes to the new channel at once.</li>
 <li>Keybinds: <code>UHF-1 Channel Up / Down</code>, <code>UHF-2 Channel Up / Down</code> (they work from any page).</li>
+<li>Volume: L3 VOL + / L4 VOL &minus; for UHF-1, R3 / R4 for UHF-2, in 5 % steps, shown next to each radio's name. Keybinds <code>UHF-1 / UHF-2 Volume Up / Down - SRS</code> do the same. Both radios start at 80 % when you get in. SRS does not report its own slider back, so the page shows the last value the add-on set.</li>
 <li>T1 EDIT 1 / T5 EDIT 2 change the selected channel's frequency: B1 &lt; and B5 &gt; pick the digit, B2 – and B4 + change it, B3 ENTR stores it (225.000–399.975 MHz).</li>
 </ul>
-<p>The add-on talks to SRS through SRS's UDP command port (9040 by default, in the SRS client's settings). It only works while SRS is running and connected.</p>
+<p>The add-on talks to SRS through SRS's UDP command port (9040 by default, in the SRS client's settings). It only works while SRS is running and connected. UHF-1 can also be run from the <a href="#radio-panel">front radio panel</a> under the HUD; when that panel is on MAN or GUARD, the RADIO page says so on UHF-1's line.</p>
 
 <h2 id="dtm-and-cartridges">DTM and cartridges</h2>
 
@@ -339,15 +341,40 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <li>READ STATUS, WRITE, WRITE STATUS and CC BUF CLEAR are there for the look of the real page.</li>
 </ul>
 <p>After a cold start the display opens here: pick your cartridge, READ, then go to SIT.</p>
+<p><strong>The cartridge's route in the jet itself.</strong> Flaming Cliffs jets take their steerpoints (and the HUD steering) from the mission when you spawn, and nothing can change them in flight. So the add-on also puts every cartridge into DCS's <strong>Route Tool</strong> as a preset <code>F-15C DTC: NAME</code> (in <code>Saved Games\DCS\Config\RouteToolPresets</code>; your own presets stay, and the file's first change is backed up as <code>.f15sit-backup</code>). Before you spawn, open the Route Tool on the F10 map, pick the preset and tick <strong>USE THIS ROUTE ON NEXT SPAWN</strong>. Spawn, READ the same cartridge, and the jet, the HUD and the SIT page all fly the same route. This works on any server. Cartridges saved before 1.2: save them once more from the DTM Planner (it now stores the DCS map coordinates the preset needs).</p>
 
 <h2 id="time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</h2>
 
 <figure class="fig"><div class="shot"><img src="img/p_time.jpg" alt="TIME / DATE page" width="800" height="850" loading="lazy"></div><figcaption>TIME / DATE: R1 ZULU / R2 LOCAL sets the SIT page's clock</figcaption></figure>
 <p><strong>OWN DATA</strong> lists your callsign, pilot, track number, position, altitude, heading, speed, fuel, your position from the bullseye and the active steerpoint.</p>
 <h3 id="flight-data" style="margin-top:28px">FLIGHT DATA</h3>
-<figure class="fig"><div class="shot"><img src="img/p_flt.jpg" alt="FLIGHT DATA page" width="800" height="850" loading="lazy"></div><figcaption>FLIGHT DATA</figcaption></figure>
-<p>L1–L5 list the friendly aircraft near you, players first (marked *); B2 / B4 page through them. Press one to make it a flight member (boxed) or to drop it; the aircraft of your own group are members anyway. Members are numbered 2, 3, 4 ... (by unit name) and drawn in cyan with their number on the SIT page; the right side gives each one's bearing / range, altitude and ground speed. Your picks are remembered between flights.</p>
+<p>The page builds your flight in four slots (v1.2). The left side, L1–L5, lists the friendly aircraft on the datalink, players first (marked *), with their slot number in front; B2 UP / B4 DN page through them. The right side shows your flight as four cards on R1–R4: slot number, callsign, bearing / range, altitude and ground speed; your own card is green, tagged OWN.</p>
+<ul>
+<li><strong>Put an aircraft in a slot:</strong> press it on the left (it gets boxed), then press a slot on the right. Or the slot first, then the aircraft. If the aircraft already had a slot, the two swap.</li>
+<li><strong>Swap two slots:</strong> press one slot, then the other. That is also how you move yourself, e.g. to #2 when you fly as the wingman.</li>
+<li><strong>B3 CLR</strong> empties the picked slot (your own slot stays). <strong>B5 AUTO</strong> (boxed while on) puts you and your group in callsign order, so as Enfield 1-2 you are #2 without touching anything; the first change by hand makes the flight manual.</li>
+<li>The yellow line under the cards says what the next press does. Flight members are drawn in cyan with their number on the SIT page and the helmet. The flight is remembered between flights; a cartridge's flight list fills the other slots and leaves yours where it is.</li>
+</ul>
 <p><strong>BIT</strong> shows CBIT (continuous) or IBIT (a 6 second test) with the jet's failed systems as NO GO lines.</p>
+
+<h2 id="radio-panel">Front radio panel, IFF and lights</h2>
+
+<p>New in 1.2: the front UHF-1 radio panel and the IFF MODE 3/A window above it (centre panel, under the HUD) and two knobs on the exterior lights panel work with the mouse. A mod can not turn ED's knobs, so they stay still; our own number drums in the CHAN, MAIN FREQ and MODE 3/A windows show what you set.</p>
+<div class="tbl"><table><thead><tr><th>Control</th><th>Click</th><th>What it does</th></tr></thead><tbody>
+<tr><td>CHAN knob</td><td>Left: up, right: down</td><td>Steps UHF-1's 20 presets and tunes SRS (as the RADIO page)</td></tr>
+<tr><td>Frequency knobs (three)</td><td>Left: up, right: down</td><td>10 MHz / 1 MHz / 25 kHz steps (225.000&ndash;399.975); switches UHF-1 to MAN</td></tr>
+<tr><td>Mode knob</td><td>Left: toward CHAN, right: toward GUARD</td><td>CHAN = the preset, MAN = the frequency knobs, GUARD = 243.000</td></tr>
+<tr><td>VOL</td><td>Left: louder, right: quieter</td><td>SRS volume of UHF-1, 5 % steps</td></tr>
+<tr><td>IFF thumbwheels (left of each digit)</td><td>Left: down, right: up</td><td>The Mode 3/A code, sent to SRS at once</td></tr>
+<tr><td>I/P</td><td>Press</td><td>IDENT for 18 seconds</td></tr>
+<tr><td>FORMATION knob (EXT LT panel, left console)</td><td>Press</td><td>Anti-collision lights on / off</td></tr>
+<tr><td>POSITION knob (EXT LT panel)</td><td>Press</td><td>Navigation (position) lights on / off</td></tr>
+</tbody></table></div>
+<ul>
+<li>SRS takes the IFF code when its IFF runs from the SRS overlay, the normal case for Flaming Cliffs jets. The add-on also sends your code about 3 seconds after you get in.</li>
+<li>Your IFF code and manual frequency are kept for the next flight (<code>Saved Games\DCS\Config\F15SIT_rfp.txt</code>).</li>
+<li>The light knobs press the jet's own <em>Navigation lights</em> and <em>Anti-collision lights</em> keys: each click switches that light, the same as the key.</li>
+</ul>
 
 <h2 id="jhmcs">JHMCS helmet display</h2>
 
@@ -394,6 +421,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <tr><td>CMD - Dispense selected program / CMD - Next program</td><td>Run / select the countermeasure program</td></tr>
 <tr><td>Combat Jettison (CBT JETT program)</td><td>Jettison the active jettison program</td></tr>
 <tr><td>UHF-1 / UHF-2 Channel Up / Down - SRS</td><td>Step the radio presets</td></tr>
+<tr><td>UHF-1 / UHF-2 Volume Up / Down - SRS</td><td>SRS volume of that radio, 5 % a press</td></tr>
 <tr><td>MPCD Lower Left - Top / Bottom / Left / Right 1-5</td><td>The 20 bezel buttons</td></tr>
 <tr><td>HMD Power ON/OFF, HMD Brightness Increase / Decrease, HMD Symbology ON/OFF</td><td>The helmet display (power mutes it without moving the cockpit switch)</td></tr>
 </tbody></table></div>
@@ -435,7 +463,7 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <p><strong>The SIT page shows no contacts and says NO DL:</strong> the export script is not running. Run <code>INSTALL.bat</code> again; check that <code>Saved Games\DCS\Scripts\Export.lua</code> has the F-15C SIT line.</p>
 <p><strong>The radio page does not tune SRS:</strong> SRS must be running and connected, and its UDP command port must be 9040.</p>
 <p><strong>The display stays dark:</strong> switch on the electric power or start an engine, and check the OFF / NIGHT / DAY knob is not at OFF.</p>
-<p><strong>Logs</strong> for bug reports: <code>Saved Games\DCS\Logs\f15sit_device.log</code>, <code>f15sit_export.log</code>, <code>f15sit_hook.log</code>, <code>f15sit_acq.log</code> (auto acquisition), <code>f15sit_wpn.log</code> (weapon switches, target step).</p>
+<p><strong>Logs</strong> for bug reports: <code>Saved Games\DCS\Logs\f15sit_device.log</code>, <code>f15sit_export.log</code>, <code>f15sit_hook.log</code> (mission drawings, Route Tool presets), <code>f15sit_acq.log</code> (auto acquisition), <code>f15sit_wpn.log</code> (weapon switches, target step).</p>
 <p><strong>Helmet acquisition does not lock:</strong> keep the target near the centre of the helmet, and give it a moment; a bigger return nearby can take the lock first.</p>
 
 

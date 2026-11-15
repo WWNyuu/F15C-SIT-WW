@@ -93,3 +93,25 @@ elements["HMD_BRT_CLICK"] = {
 	cycle               = false,
 	relative            = {false},
 }
+
+-- v1.1: front UHF-1 radio panel and IFF MODE 3/A (centre panel, under the
+-- HUD). ED's knobs and drums can not be moved from a mod: the clicks work,
+-- our digits show the result. Connectors RFP_* / IFF_* of Shapes\F15C_SIT.edm;
+-- arguments 900+ belong to nothing (the click needs one).
+local RC = RFP_CMD
+elements["RFP_CHAN_KNOB"] = two_way("UHF-1 channel (left click: up, right click: down)", RC.CHAN_UP, RC.CHAN_DN, 901)
+elements["RFP_FREQ_KNOB1"] = two_way("UHF-1 frequency, 10 MHz (left click: up, right click: down)", RC.F1_UP, RC.F1_DN, 902)
+elements["RFP_FREQ_KNOB2"] = two_way("UHF-1 frequency, 1 MHz (left click: up, right click: down)", RC.F2_UP, RC.F2_DN, 903)
+elements["RFP_FREQ_KNOB3"] = two_way("UHF-1 frequency, 25 kHz (left click: up, right click: down)", RC.F3_UP, RC.F3_DN, 904)
+elements["RFP_VOL_KNOB"] = two_way("UHF-1 volume (SRS; left click: louder, right click: quieter)", RC.VOL_UP, RC.VOL_DN, 905)
+elements["RFP_MODE_KNOB"] = two_way("UHF-1 mode: CHAN / MAN / GUARD (left click: toward CHAN, right click: toward GUARD)", RC.MODE_CCW, RC.MODE_CW, 906)
+for k = 1, 4 do
+	elements["IFF_M3_W" .. k] = two_way("IFF mode 3/A, digit " .. k .. " (SRS; left click: down, right click: up)", RC["W" .. k .. "_DN"], RC["W" .. k .. "_UP"], 906 + k)
+end
+elements["IFF_IP"] = button("IFF I/P (identify, SRS)", RC.IP, 911)
+
+-- v1.1: exterior lights panel (left console): the FORMATION and POSITION
+-- knobs as two buttons for the jet's lights (FC3: anti-collision and
+-- navigation lights, each on / off). Connectors EXTLT_* of Shapes\F15C_SIT.edm.
+elements["EXTLT_FORM_CLICK"] = button("Anti-collision lights ON / OFF", EXTLT_CMD.FORM, 912)
+elements["EXTLT_POS_CLICK"] = button("Navigation (position) lights ON / OFF", EXTLT_CMD.POS, 913)

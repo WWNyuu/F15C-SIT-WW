@@ -124,6 +124,9 @@ SIT.EWR_EXTRAP_S  = 120
 -- SRS: its UDP command port (SRS client setting, default 9040). The RADIO
 -- page tunes SRS's UHF-1 (radio 1) / UHF-2 (radio 2) to the picked channel.
 SIT.SRS_PORT = 9040
+-- SRS volume of UHF-1 / UHF-2 (SET_VOLUME): set at start, step per press, in %
+SIT.SRS_VOL_START = 80
+SIT.SRS_VOL_STEP = 5
 
 -- own missiles in flight shown at once (export: F15SITW), mark points kept
 -- power: the display comes on with the jet's power (electric power switch,

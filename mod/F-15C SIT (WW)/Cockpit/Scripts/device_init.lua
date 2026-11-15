@@ -32,4 +32,10 @@ if get_aircraft_type() == "F-15C" then
 	-- and the knob are part of the model)
 	indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "HMD/panel/init_panel.lua",
 		nil, {{"HMDP_C", "HMDP_B", "HMDP_R"}, {}}}
+	-- v1.1: the front UHF-1 radio panel and the IFF MODE 3/A window: our
+	-- number drums over ED's (the model's patches and click points)
+	indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "RFP/init_rfp.lua",
+		nil, {{"RFP_C", "RFP_B", "RFP_R"}, {}}}
+	indicators[#indicators + 1] = {"ccIndicator", LockOn_Options.script_path .. "RFP/init_iff.lua",
+		nil, {{"IFF_C", "IFF_B", "IFF_R"}, {}}}
 end
