@@ -1089,6 +1089,9 @@ hmd_controls_tick(0)
 --   depress         return to search
 -- and the helmet acquisition bind. The export does the work (F15SITA).
 local AQ = {fwd_t = nil, fwd_long = false}
+-- (v1.3 SIT lock: the hooked contact, now; set by draw_contacts, read by
+-- SetCommand - declared here, before both: G is declared after SetCommand)
+local SITLOCK = {at = nil}
 local HACQ_P = get_param_handle("F15SIT_HACQ")
 local function acq_send(what)
 	-- the radar takes the cursor back from the SIT page
@@ -1197,7 +1200,7 @@ function SetCommand(command, value)
 	-- locks it (F15SITA,ST; the radar gets the cursor back). FC3 sees the key
 	-- too; the export drops a lock that is not on the SIT contact.
 	if SLEW.cmds and command == tonumber(SLEW.cmds.lock) then
-		local L = G.hook_at
+		local L = SITLOCK.at
 		if PWR.on and ST.soi_sit and ST.page == PG.SIT and L and now() - L.t < 1 then
 			acq_send(string.format("ST,%.0f,%.0f,%.0f,%.1f,%.1f", L.x, L.y, L.z, L.vx, L.vz))
 		end
@@ -1435,12 +1438,12 @@ local function draw_contacts(t, stale)
 		H.hk_col:set(CONTACT_COL[hk_code % 10] or 3)
 		H.hkm.x:set(hk_sx); H.hkm.y:set(hk_sy); H.hkm.vis:set(1)
 		-- (v1.3 SIT lock: where the hooked contact is now, for the lock key)
-		local L = G.hook_at or {}
+		local L = SITLOCK.at or {}
 		L.x, L.z, L.y, L.vx, L.vz, L.t = hk_x, hk_z, c.y or 0, c.vx or 0, c.vz or 0, t
-		G.hook_at = L
+		SITLOCK.at = L
 	else
 		H.hk_vis:set(0); H.hkm.vis:set(0)
-		G.hook_at = nil
+		SITLOCK.at = nil
 	end
 end
 
