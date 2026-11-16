@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.2
+-- F15SIT_Export.lua  --  feed for the F-15C SIT (WW) page, version 1.3
 --
 -- Based on MiG29DL_Export.lua of the Vitezovi MiG-29 MFD add-on, with the
 -- SAME picture rules (own radar always; friendlies and the hostiles that a
@@ -8,7 +8,7 @@
 -- lines, but:
 --   * only active in the Flaming Cliffs F-15C (unit type "F-15C")
 --   * sends to 127.0.0.1:42889 (the MiG-29 add-on keeps 42888)
---   * packets start with "F15SIT"; RWR lines come from LoGetTWSInfo
+--   * packets start with "F15SIT"
 --   * log: Saved Games\DCS\Logs\f15sit_export.log
 --
 -- Loaded from Saved Games\DCS\Scripts\Export.lua with:
@@ -105,7 +105,7 @@ local DL = {
 -- (RWR packets off: the SIT page shows no RWR, the TEWS scope does)
 -- (f15c_sit_logs: timing and debug logs, for testing; off by default)
 -- (f15c_sit_hmd: the JHMCS; off = no view directions sent to the cockpit)
-local OPT = {f15c_sit_enabled = true, f15c_sit_datalink = true, f15c_sit_rwr = false, f15c_sit_logs = false,
+local OPT = {f15c_sit_enabled = true, f15c_sit_datalink = true, f15c_sit_logs = false,
              f15c_sit_hmd = true}
 local function read_options()
 	pcall(function()
@@ -1236,27 +1236,9 @@ local function dbg(msg)
 	end)
 end
 SCAN.log = dbg              -- (v1.7.5: busy-mission switch in the export log)
--- RWR, in its own small packet "F15SITV": the emitters the F-15C's RWR
--- hears (LoGetTWSInfo), 10 times a second, sent when the list changes and
--- twice a second to keep it alive.
---   V,azimuth (rad, relative, + = right),power (0-1),state (1 search,
---     2 lock, 3 missile guidance),level1,type name
-local last_rwr, last_rwr_send, last_spo = -1000, -1000, nil
-local SIG = {scan = 1, lock = 2, missile_radio_guided = 3, track_while_scan = 2}
-local function spo_line(t)
-	local tws = try(LoGetTWSInfo)
-	if type(tws) ~= "table" then return nil end
-	local out = {}
-	for _, e in pairs(type(tws.Emitters) == "table" and tws.Emitters or {}) do
-		local ty = type(e.Type) == "table" and e.Type or {}
-		local nm = ""
-		if LoGetNameByType then nm = try(LoGetNameByType, ty.level1 or 0, ty.level2 or 0, ty.level3 or 0, ty.level4 or 0) or "" end
-		out[#out + 1] = string.format("V,%.3f,%.2f,%d,%d,%s", tonumber(e.Azimuth) or 0, tonumber(e.Power) or 0,
-			SIG[e.SignalType] or 1, ty.level1 or 0, clean(nm))
-		if #out >= 16 then break end
-	end
-	return table.concat(out, "\n")
-end
+-- (v1.3: the RWR packet "F15SITV" from the export is gone - the SIT
+-- device never used it, the TEWS scope shows the RWR. "F15SITV,<req>" from
+-- the device to the export, below, is the weapon select request.)
 -- countermeasure programs and jettison, asked for by the SIT
 -- device (it sends to 127.0.0.1:42890):
 --   F15SITX,chaff,flares,interval (s),cycles   run a dispense program
@@ -1330,6 +1312,7 @@ local function cmds_tick(t)
 			elseif m:sub(1, 7) == "F15SITA" then
 				-- the device: auto acq switch / helmet acquisition
 				ACQ.req = m:match("^F15SITA,(%u+)")
+				ACQ.req_arg = m:match("^F15SITA,%u+,(.*)$")
 			elseif m:sub(1, 7) == "F15SITG" then
 				-- the device: datalink picture on screen (1) or not (0)
 				local on = m:sub(9, 9) ~= "0"
@@ -1400,7 +1383,14 @@ local ACQ_DEF = {
 	SS = {code = 1, cone = math.rad(10), rmin = 150, rmax = 10 * 1852},
 	LR = {code = 2, cone = math.rad(2), rmin = 900, rmax = 40 * 1852},
 	HM = {code = 3, cone = math.rad(6), rmin = 150, rmax = 10 * 1852},
+	-- v1.3 SIT lock: the contact hooked on the SIT page (the lock key while
+	-- the SIT page has the cursor). "F15SITA,ST,x,y,z,vx,vz": where it is
+	-- now and its velocity; the radar contact within ST_MATCH of where it
+	-- is by then is locked. Range and cone per request (below).
+	ST = {code = 4, cone = math.pi, rmin = 150, rmax = 10 * 1852},
 }
+local ST_MAX_S = 15                 -- SIT lock: gives up after this (the target out of the radar's reach)
+local function st_match(r) return 3000 + 0.03 * r end     -- (m: a radar contact this close to the SIT contact is it)
 local ACQ_SCALES = {18520, 37040, 74080, 148160, 296320}   -- (the VSD's range scales, m)
 local ACQ_MEM_S = 6                                        -- (a radar contact is remembered this long)
 local ACQ_MAX_S = 120                                       -- (then it gives up: the TDC is the pilot's again)
@@ -1477,7 +1467,7 @@ local function el_stop(c)
 end
 acq_end = function(c, why)
 	if ACQ.mode then alog(string.format("%s ended: %s (%.1f s, %d lock presses)", ACQ.mode, why, (LoGetModelTime and LoGetModelTime() or 0) - ACQ.t0, ACQ.lock_n)) end
-	ACQ.mode = nil
+	ACQ.mode, ACQ.st = nil, nil
 	if c then
 		acq_axes0(c)
 		el_stop(c)
@@ -1560,8 +1550,8 @@ local function el_drive(c, dir, t, el, cmax, still)
 		if EL.method == 2 or EL.kind ~= "position" then push(EL.method, 0) end
 	else push(EL.method, dir * EL.sign) end
 end
-local function acq_request(c, req, t)
-	alog("request: " .. req .. "  (radar mode " .. table.concat({acq_master()}, " / ") .. ")")
+local function acq_request(c, req, t, arg)
+	alog("request: " .. req .. (arg and (" " .. arg) or "") .. "  (radar mode " .. table.concat({acq_master()}, " / ") .. ")")
 	if req == "RTS" then
 		if ACQ.mode then acq_end(c, "return to search") end
 		if acq_locked() and c.reset then LoSetCommand(c.reset) end
@@ -1576,6 +1566,13 @@ local function acq_request(c, req, t)
 		return
 	end
 	if not ACQ_DEF[req] then return end
+	local st
+	if req == "ST" then
+		local f = {}
+		for v in tostring(arg or ""):gmatch("[^,]+") do f[#f + 1] = tonumber(v) end
+		if #f < 5 then alog("SIT lock: no target position"); return end
+		st = {x = f[1], y = f[2], z = f[3], vx = f[4], vz = f[5], t = t}
+	end
 	-- (v1.1: supersearch stays on the nose - helmet acquisition has the
 	-- auto acq switch forward)
 	if ACQ.mode then acq_end(c, "new request") end
@@ -1585,15 +1582,19 @@ local function acq_request(c, req, t)
 	-- the auto acquisition modes start from search: a lock is dropped first
 	if acq_locked() and c.reset then LoSetCommand(c.reset); ACQ.wait = t + 0.4 end
 	ACQ.aim = nil
-	alog("start " .. req .. "  [acq v4]")
+	ACQ.st, ACQ.st_wrong, ACQ.st_az_said = st, 0, false
+	-- (SIT lock: the pilot's lock press reaches FC3 too; it may lock what is
+	-- under the radar's own cursor - looked at once it has settled)
+	if st then ACQ.wait = t + 0.4 end
+	alog("start " .. req .. "  [acq v5]")
 end
 local function acq_tick(t)
 	local c = cm_cmds(t)
 	if ACQ.lock_up and c and c.lock_up then LoSetCommand(c.lock_up); ACQ.lock_up = false end
 	if ACQ.req then
-		local r = ACQ.req
-		ACQ.req = nil
-		if c then acq_request(c, r, t) else alog("no command numbers (Logs\\f15sit_icmd.lua): run INSTALL.bat again") end
+		local r, arg = ACQ.req, ACQ.req_arg
+		ACQ.req, ACQ.req_arg = nil, nil
+		if c then acq_request(c, r, t, arg) else alog("no command numbers (Logs\\f15sit_icmd.lua): run INSTALL.bat again") end
 	end
 	if not ACQ.mode or not c or not LoSetCommand then return end
 	if not (c.lock and c.lock_up and c.sel_h and c.zoom_in) then
@@ -1601,7 +1602,34 @@ local function acq_tick(t)
 	end
 	if ACQ.wait and t < ACQ.wait and t >= ACQ.t0 then return end
 	ACQ.wait = nil
-	if t - ACQ.t0 > ACQ_MAX_S or t < ACQ.t0 then acq_end(c, "timed out"); return end
+	if t - ACQ.t0 > (ACQ.mode == "ST" and ST_MAX_S or ACQ_MAX_S) or t < ACQ.t0 then
+		acq_end(c, ACQ.mode == "ST" and "timed out: the radar did not see the SIT contact (outside its azimuth or range, or not painted)" or "timed out"); return
+	end
+	-- (SIT lock: where the SIT contact is now)
+	local P
+	if ACQ.st then
+		local a = t - ACQ.st.t
+		P = {x = ACQ.st.x + ACQ.st.vx * a, y = ACQ.st.y, z = ACQ.st.z + ACQ.st.vz * a}
+	end
+	if acq_locked() and P then
+		-- a lock, but on the SIT contact? (FC3 may have locked what was under
+		-- the radar's cursor when the pilot pressed the lock key)
+		local lk = try(LoGetLockedTargetInformation)
+		local o = type(lk) == "table" and lk[1] and lk[1].target
+		local x, y, z
+		if o then x, y, z = pos_of(o) end
+		local me0 = try(LoGetSelfData)
+		local r0 = (type(me0) == "table" and type(me0.Position) == "table") and math.sqrt((P.x - me0.Position.x) ^ 2 + (P.z - me0.Position.z) ^ 2) or 0
+		if x and math.max(math.abs(x - P.x), math.abs(z - P.z)) > 2 * st_match(r0) then
+			ACQ.st_wrong = ACQ.st_wrong + 1
+			alog(string.format("SIT lock: locked %s %.1f NM from the SIT contact - dropped (%d)", tostring(o.ID),
+				math.max(math.abs(x - P.x), math.abs(z - P.z)) / 1852, ACQ.st_wrong))
+			if ACQ.st_wrong > 3 then acq_end(c, "kept locking another contact"); return end
+			if c.reset then LoSetCommand(c.reset) end
+			ACQ.wait, ACQ.lock_t = t + 0.4, nil
+			return
+		end
+	end
 	if acq_locked() then
 		local a, me0 = ACQ.aim, try(LoGetSelfData)
 		local lk = try(LoGetLockedTargetInformation)
@@ -1634,6 +1662,12 @@ local function acq_tick(t)
 	if type(me) ~= "table" or type(me.Position) ~= "table" then return end
 	local ox, oy, oz = me.Position.x, me.Position.y, me.Position.z
 	local hdg = tonumber(me.Heading) or 0
+	-- (SIT lock: the range scale must hold the SIT contact, with a margin)
+	local Pr
+	if P then
+		Pr = math.sqrt((P.x - ox) ^ 2 + (P.y - oy) ^ 2 + (P.z - oz) ^ 2)
+		d = {cone = math.pi, rmin = 150, rmax = Pr * 1.15 + 1852}
+	end
 	-- 2) the range scale: the smallest that holds the mode's range
 	local sc = type(si.scale) == "table" and si.scale or {}
 	local dist, saz = tonumber(sc.distance) or 0, tonumber(sc.azimuth) or 1.0472
@@ -1650,7 +1684,15 @@ local function acq_tick(t)
 	--    acquisition, and LRBST while the helmet is on)
 	local rx, ry, rz = acq_nose(me)
 	local cued = false
-	if ACQ.mode == "HM" or (ACQ.mode == "LR" and OPT.f15c_sit_hmd) then
+	if P and Pr > 1 then
+		rx, ry, rz = (P.x - ox) / Pr, (P.y - oy) / Pr, (P.z - oz) / Pr
+		-- (outside the radar's azimuth limits: said once, the cursor waits at the edge)
+		local rel = wrap_pi(math.atan2(P.z - oz, P.x - ox) - hdg)
+		if math.abs(rel) >= saz * 0.98 and not ACQ.st_az_said then
+			ACQ.st_az_said = true
+			alog(string.format("SIT lock: the contact is %.0f deg off the nose, outside the radar's %.0f deg: waiting", math.deg(math.abs(rel)), math.deg(saz)))
+		end
+	elseif ACQ.mode == "HM" or (ACQ.mode == "LR" and OPT.f15c_sit_hmd) then
 		local lx, ly, lz = acq_look(me)
 		if lx then rx, ry, rz, cued = lx, ly, lz, true end
 	end
@@ -1679,11 +1721,13 @@ local function acq_tick(t)
 			local x, y, z = o.x + o.vx * age, o.y + o.vy * age, o.z + o.vz * age
 			local dx, dy, dz = x - ox, y - oy, z - oz
 			local r = math.sqrt(dx * dx + dy * dy + dz * dz)
-			if r >= d.rmin and r <= d.rmax and (dx * rx + dy * ry + dz * rz) >= cosc * r then
+			-- (SIT lock: only a contact where the SIT contact is; scored by how near)
+			local stm = P and math.max(math.abs(x - P.x), math.abs(z - P.z))
+			if r >= d.rmin and r <= d.rmax and (dx * rx + dy * ry + dz * rz) >= cosc * r and (not P or stm <= st_match(Pr)) then
 				local rel = wrap_pi(math.atan2(dz, dx) - hdg)
 				-- (the score: helmet cued - the angle off the cue's centre,
-				-- else the range)
-				local score = cued and -((dx * rx + dy * ry + dz * rz) / r) or r
+				-- SIT lock - the distance from the SIT contact, else the range)
+				local score = P and stm or (cued and -((dx * rx + dy * ry + dz * rz) / r) or r)
 				if math.abs(rel) < saz * 0.98 and (not best or score < best) then
 					best = score
 					ACQ.cand, ACQ.cx, ACQ.cy, ACQ.cz, ACQ.cr, ACQ.cid = true, x, y, z, r, id
@@ -1703,6 +1747,12 @@ local function acq_tick(t)
 		tx = wrap_pi(math.atan2(dz, dx) - hdg) / saz
 		ty = 2 * math.sqrt(dx * dx + dz * dz) / dist - 1
 		href = ACQ.cy
+	elseif P then
+		-- (SIT lock: the cursor waits on the SIT contact's place)
+		local dx, dz = P.x - ox, P.z - oz
+		tx = wrap_pi(math.atan2(dz, dx) - hdg) / saz
+		ty = 2 * math.sqrt(dx * dx + dz * dz) / dist - 1
+		href = P.y
 	else
 		local r0 = (ACQ.mode == "LR" and 0.75 or 0.6) * d.rmax
 		tx = wrap_pi(math.atan2(rz, rx) - hdg) / saz
@@ -2241,19 +2291,6 @@ local function msl_tick(t)
 	if u then u:send(table.concat(out, "|")); MSL.sent_empty = #keep == 0 end
 end
 
-local function rwr_tick(t)
-	if not OPT.f15c_sit_rwr then return end
-	if t - last_rwr < 0.1 and t >= last_rwr then return end
-	last_rwr = t
-	if not ident(t) then return end
-	local line = spo_line(t)
-	if line and (line ~= last_spo or t - last_rwr_send >= 0.5) then
-		local u = get_udp()
-		if not u then return end
-		last_spo, last_rwr_send = line, t
-		u:send("F15SITV\n" .. line)
-	end
-end
 
 -----------------------------------------------------------------------
 -- timing log (Options > Special > F-15C SIT: timing and debug logs, off
@@ -2418,8 +2455,6 @@ local function our_after()
 	if not ok then log_err(err); dbg("error: " .. tostring(err)) end
 	if PERF.on then pc, pm = perf_add(SCHED.scan and "dl scan" or "datalink", pc, pm) end
 	SCHED.scan = false
-	local ok2, err2 = pcall(rwr_tick, t)
-	if not ok2 then dbg("rwr error: " .. tostring(err2)) end
 	-- (the device's requests are always read: a release of the TDC hold must
 	-- get through whatever happens)
 	local ok4, err4 = pcall(cmds_tick, t)
@@ -2540,7 +2575,6 @@ local function reset_state()
 	SCAN.every, SCAN.n_log = nil, 0
 	PIC.need, PIC.t = true, nil
 	last_send, last_awacs, last_prune = -1000, -1000, -1000
-	last_rwr, last_rwr_send, last_spo = -1000, -1000, nil
 	last_log, log_count = -1000, 0
 	name_cache = {}
 	clean_cache, clean_n = {}, 0
@@ -2567,7 +2601,7 @@ do
 		read_options()
 		perf_read_setting()
 		if PERF.on then dbg("perf_log on: timing in Logs/f15sit_export_perf.log") end
-		dbg("LuaExportStart: options on=" .. tostring(OPT.f15c_sit_enabled) .. " datalink=" .. tostring(OPT.f15c_sit_datalink) .. " rwr=" .. tostring(OPT.f15c_sit_rwr) .. " hmd=" .. tostring(OPT.f15c_sit_hmd))
+		dbg("LuaExportStart: options on=" .. tostring(OPT.f15c_sit_enabled) .. " datalink=" .. tostring(OPT.f15c_sit_datalink) .. " hmd=" .. tostring(OPT.f15c_sit_hmd))
 	end
 	local function our_stop()
 		if F15SIT_GEN ~= RUN.gen then return end

@@ -42,6 +42,8 @@ SIT.FONT_CAP      = 77 / 128  -- texture: capital height / cell height
 SIT.G             = 0.0742
 SIT.PORT          = 42889   -- UDP from Scripts\F15SIT_Export.lua
 SIT.STALE_S       = 8       -- datalink picture older than this = NO DL
+SIT.NO_EXPORT_S   = 10      -- nothing from the export script this long after start: "NO EXPORT DATA" (status line + log)
+SIT.HMD_SIT_RANGE = true    -- helmet: contacts / SAMs only out to the SIT page range (false = all, as before 1.3)
 SIT.UPDATE        = 0.05    -- device update step (s)
 
 -- contact codes (from the export, same as the MiG-29 add-on):
@@ -102,7 +104,7 @@ SIT.CMD_DEF = {
 }
 -- a friendly / unknown contact this close (m) to a flight member is that
 -- member (radar track and datalink report of one aircraft drawn once)
-SIT.FLT_MATCH_M   = 150
+SIT.FLT_MATCH_M   = 400     -- a flight member and a contact this close (m, both moved on to now) are the same aircraft
 
 -- SIT cursor (castle up): speed of the TDC slew / SIT cursor binds
 SIT.SLEW_SCALE    = 1.0     -- SIT cursor speed: 1 = as fast across the SIT display as the radar cursor across the radar display; 2 = twice that

@@ -1,8 +1,29 @@
-F-15C SIT (WW) 1.2 - SIT page and JHMCS for the Flaming Cliffs F-15C
+F-15C SIT (WW) 1.3 - SIT page and JHMCS for the Flaming Cliffs F-15C
 =====================================================================
 
 All controls, what they do and where to bind them:
 F-15C SIT Controls Guide.pdf (in this folder).
+
+New in 1.3
+----------
+- SIT radar lock: castle up (SIT has the cursor), put the cursor on a
+  contact, press your radar lock key - the radar slews onto that contact
+  and locks it (only what the radar can see: inside its +-60 deg and range;
+  gives up after 15 s)
+- Helmet shows contacts and SAM rings only out to the SIT page's range
+  (own flight members always); sit_config.lua SIT.HMD_SIT_RANGE = false
+  for the old behaviour
+- Flight members no longer shown twice on the helmet (member and its
+  datalink contact are matched where both are now)
+- EXP mode: the compass rose no longer spills past the display; the
+  ownship symbol hides when EXP is far from it
+- Cleaner text in VR: MFD font with heavier strokes, radio / IFF digits,
+  both without the ghost edges and block noise at a distance
+- "NO EXPORT DATA" on the SIT status line (and a line in the device log)
+  when the export script sends nothing - Export.lua line missing or blocked
+- The installer puts its Export.lua line at the TOP, so another tool's
+  broken line above it cannot stop it (older installs: run INSTALL.bat)
+- Removed an unused RWR packet from the export script
 
 New in 1.2
 ----------
@@ -43,7 +64,8 @@ Install
 2. Close DCS, run INSTALL.bat (in this folder). It
    - copies Scripts\F15SIT_Export.lua and Scripts\Hooks\F15SIT_hook.lua
      into Saved Games\DCS\Scripts
-   - adds one line to Saved Games\DCS\Scripts\Export.lua
+   - adds one line at the top of Saved Games\DCS\Scripts\Export.lua (so a
+     broken line of another tool above it cannot stop it)
    - adds the add-on's controls to the F-15C's controls
      (Options > Controls > F-15C, category "F-15C SIT")
 3. After every DCS update or repair: run INSTALL.bat again. DCS puts its own

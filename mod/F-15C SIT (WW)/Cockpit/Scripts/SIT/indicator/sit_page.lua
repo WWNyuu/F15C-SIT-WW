@@ -332,6 +332,8 @@ simple("sit_own", "sit_pg", {0, 0, 0}, {"F15SIT_OWN_Y", "F15SIT_OWN_X"},
 --   decentred: ownship low; a large solid circle in the middle of the
 --              display, its top = the range shown; small compass rose
 --              around the ownship, no half-range ring
+--   EXP (v1.3): neither - the rose sits around the ownship, which EXP
+--              moves anywhere (it spilled past the glass); F15SIT_CENTER 2
 simple("sit_sc_c", "sit_own", {0, 0, 0}, {"F15SIT_CENTER"}, {vis(0, 0.5, 1.5)})
 simple("sit_sc_d", "sit_own", {0, 0, 0}, {"F15SIT_CENTER"}, {vis(0, -0.5, 0.5)})
 -- the large circle sits in the middle of the display (the ownship below its
@@ -631,7 +633,9 @@ for k = 1, SIT.MAX_MARKS do
 end
 
 -- ownship, on top --------------------------------------------------------------
-simple("sit_own_r", "sit_own", {0, 0, 0}, {"F15SIT_OWN_ROT"}, {{"rotate_using_parameter", 0, 1}})
+-- (v1.3: hidden while the ownship is off the SIT area - EXP far from it)
+simple("sit_own_v", "sit_own", {0, 0, 0}, {"F15SIT_OWN_VIS"}, {vis(0, 0.5, 1.5)})
+simple("sit_own_r", "sit_own_v", {0, 0, 0}, {"F15SIT_OWN_ROT"}, {{"rotate_using_parameter", 0, 1}})
 v, i = poly_lines(scaled({{0, 0.06}, {0.010, 0.026}, {0.048, 0.0}, {0.048, -0.010}, {0.009, 0.0},
 	{0.007, -0.034}, {0.022, -0.047}, {0, -0.043}, {-0.022, -0.047}, {-0.007, -0.034},
 	{-0.009, 0.0}, {-0.048, -0.010}, {-0.048, 0.0}, {-0.010, 0.026}}, 0.8), true)

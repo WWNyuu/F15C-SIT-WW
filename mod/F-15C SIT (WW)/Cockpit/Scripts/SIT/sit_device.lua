@@ -93,6 +93,7 @@ H.cur_sit = P("CUR_SIT"); H.autor = P("AUTOR")
 H.pdt = {ax = P("PDT_AX"), ay = P("PDT_AY"), bx = P("PDT_BX"), by = P("PDT_BY"), vis = P("PDT_VIS")}
 H.ics_fail = P("ICS_FAIL")
 H.own_x = P("OWN_X")
+H.own_vis = P("OWN_VIS")                     -- ownship symbol on the SIT area (EXP can move it off)
 H.geo = {}
 for j = 1, SIT.GEO_SEGS do
 	local p = "GS" .. j .. "_"
@@ -423,7 +424,6 @@ end
 local CUR_F = {}                                        -- (F15SITC fields, reused: 20 packets a second)
 local C_NAME = "^C" .. string.rep(",[^,]*", 7) .. ",([^,]*)$"   -- (a contact's name: field 8)
 local function parse(data)
-	if data:sub(1, 7) == "F15SITV" then return end      -- RWR packets: not used (the TEWS scope shows the RWR)
 	if data:sub(1, 7) == "F15SITB" then                  -- bullseye from the hook: red x,z, blue x,z
 		local f = {}
 		for v in data:gmatch(",([^,]*)") do f[#f + 1] = tonumber(v) or false end
@@ -585,11 +585,15 @@ local function parse(data)
 	end
 end
 
+local HOOK_PFX = {B = true, D = true, E = true, L = true, P = true, R = true}
 local function read_udp()
 	if not udp then return end
 	for _ = 1, 20 do
 		local data = udp:receive(32768)
 		if not data then break end
+		-- (any packet not from the hook - B D E L P R - is from the export
+		-- script: the "no export data" check in update)
+		if not HOOK_PFX[data:sub(7, 7)] or data:sub(1, 6) ~= "F15SIT" then feed.exp_t = now() end
 		local ok, err = pcall(parse, data)
 		if not ok and not feed.err then feed.err = true; log("packet error: " .. tostring(err)) end
 	end
@@ -1188,6 +1192,17 @@ function SetCommand(command, value)
 		end
 		return
 	end
+	-- v1.3 SIT lock: the jet's lock key while the SIT page has the cursor and
+	-- a contact is hooked: the export slews the radar onto that contact and
+	-- locks it (F15SITA,ST; the radar gets the cursor back). FC3 sees the key
+	-- too; the export drops a lock that is not on the SIT contact.
+	if SLEW.cmds and command == tonumber(SLEW.cmds.lock) then
+		local L = G.hook_at
+		if PWR.on and ST.soi_sit and ST.page == PG.SIT and L and now() - L.t < 1 then
+			acq_send(string.format("ST,%.0f,%.0f,%.0f,%.1f,%.1f", L.x, L.y, L.z, L.vx, L.vz))
+		end
+		return
+	end
 	if slew_command(command, value) then return end
 	-- no power: nothing of the add-on works; display off / starting up: its
 	-- buttons and the page's HOTAS functions do nothing (radio, countermeasures
@@ -1290,6 +1305,40 @@ local CONTACT_COL = {[1] = 1, [2] = 2, [3] = 3, [4] = 1, [5] = 4, [6] = 1}   -- 
 
 local IDENT = {[1] = "FRIEND", [2] = "HOSTILE", [3] = "UNKNOWN", [4] = "AWACS", [5] = "FLIGHT", [6] = "FRIEND"}
 local TAKE, SKIP, NOMEM = {}, {}, {}
+-- flight members (v0.9) and their contacts: each member takes the nearest
+-- friendly / unknown contact within FLT_MATCH_M; any other such contact that
+-- close is the same aircraft again (radar track + datalink report) and is
+-- skipped. v1.3: both compared where they are NOW (contact and member moved
+-- on along their velocity): a datalink contact can be seconds old (busy
+-- missions reuse the last scan), the member's own position a second old, and
+-- unmoved they missed each other - the helmet then showed the member twice
+-- (its callsign and the contact's type on top of each other). A contact a
+-- member took is never skipped (close formation, members in any order).
+-- flag: the member field set to "has a contact" (shown / hm)
+local function match_members(list, members, t, take, skip, flag)
+	for k in pairs(take) do take[k] = nil end
+	for k in pairs(skip) do skip[k] = nil end
+	local R = SIT.FLT_MATCH_M
+	local am = math.min(math.max(t - (feed.rx or t), 0), 20)
+	for _, a in ipairs(members) do
+		local axn, azn = a.x + (a.vx or 0) * am, a.z + (a.vz or 0) * am
+		local best, bd = nil, R
+		for i, c in ipairs(list) do
+			local b = (c.code or 0) % 10
+			if b ~= 2 and b ~= 4 then
+				local age = math.min(math.max(t - (c.t or t), 0), c.mx or 20)
+				local d = math.max(abs(c.x + (c.vx or 0) * age - axn), abs(c.z + (c.vz or 0) * age - azn))
+				if d < R then
+					skip[i] = true
+					if d < bd and not take[i] then best, bd = i, d end
+				end
+			end
+		end
+		a[flag] = best ~= nil
+		if best then take[best] = a end
+	end
+	for k in pairs(take) do skip[k] = nil end
+end
 local function draw_contacts(t, stale)
 	local used = 0
 	local list = EWR.merge(feed.list, t, stale)
@@ -1298,24 +1347,7 @@ local function draw_contacts(t, stale)
 	-- within FLT_MATCH_M; any other such contact that close is the same aircraft
 	-- again (radar track + datalink report) and is not drawn. A member with
 	-- no contact at all is drawn from its own position.
-	for k in pairs(TAKE) do TAKE[k] = nil end
-	for k in pairs(SKIP) do SKIP[k] = nil end
-	for _, a in ipairs(members) do
-		local best, bd = nil, SIT.FLT_MATCH_M
-		for i, c in ipairs(list) do
-			local b = (c.code or 0) % 10
-			if b ~= 2 and b ~= 4 then
-				local age = math.min(math.max(t - (c.t or t), 0), c.mx or 20)
-				local d = math.max(abs(c.x + (c.vx or 0) * age - a.x), abs(c.z + (c.vz or 0) * age - a.z))
-				if d < SIT.FLT_MATCH_M then
-					SKIP[i] = true
-					if d < bd then best, bd = i, d end
-				end
-			end
-		end
-		a.shown = best ~= nil
-		if best then TAKE[best] = a; SKIP[best] = nil end
-	end
+	match_members(list, members, t, TAKE, SKIP, "shown")
 	-- hook: the contact nearest the cursor, within HOOK_R of it
 	local hook, hook_d = nil, SIT.HOOK_R          -- (the hooked contact and its place, no table per update)
 	local hk_x, hk_z, hk_sx, hk_sy, hk_code, hk_num
@@ -1402,8 +1434,13 @@ local function draw_contacts(t, stale)
 		H.hk_vis:set(1)
 		H.hk_col:set(CONTACT_COL[hk_code % 10] or 3)
 		H.hkm.x:set(hk_sx); H.hkm.y:set(hk_sy); H.hkm.vis:set(1)
+		-- (v1.3 SIT lock: where the hooked contact is now, for the lock key)
+		local L = G.hook_at or {}
+		L.x, L.z, L.y, L.vx, L.vz, L.t = hk_x, hk_z, c.y or 0, c.vx or 0, c.vz or 0, t
+		G.hook_at = L
 	else
 		H.hk_vis:set(0); H.hkm.vis:set(0)
+		G.hook_at = nil
 	end
 end
 
@@ -2363,7 +2400,7 @@ init_texts()        -- at load already, before the first frame
 
 function post_initialize()
 	init_texts()
-	log("=== F-15C SIT 1.2, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
+	log("=== F-15C SIT 1.3, aircraft " .. tostring(get_aircraft_type and get_aircraft_type()))
 	for name, cmd in pairs(SIT_CMD) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_HOTAS) do dev:listen_command(cmd) end
 	for name, cmd in pairs(SIT_PANEL) do dev:listen_command(cmd) end
@@ -2388,7 +2425,7 @@ function post_initialize()
 		if type(c) == "table" then
 			SLEW.cmds = c
 			local s = {}
-			for _, k in ipairs({"sel_h", "sel_v", "axis_h", "axis_v", "axis_h_abs", "axis_v_abs", "zoom_in", "zoom_out"}) do
+			for _, k in ipairs({"sel_h", "sel_v", "axis_h", "axis_v", "axis_h_abs", "axis_v_abs", "zoom_in", "zoom_out", "lock"}) do
 				if tonumber(c[k]) then dev:listen_command(c[k]); s[#s + 1] = k .. "=" .. c[k] end
 			end
 			log("listening to the radar slew commands: " .. table.concat(s, " "))
@@ -2704,20 +2741,7 @@ local function publish_hmd(t)
 	end
 	-- contacts: flight members take their contact (as on the SIT page)
 	local members = stale and NOMEM or flt_members()
-	for k in pairs(HM_TAKE) do HM_TAKE[k] = nil end
-	for k in pairs(HM_SKIP) do HM_SKIP[k] = nil end
-	for _, a in ipairs(members) do
-		local best, bd = nil, SIT.FLT_MATCH_M
-		for i, c in ipairs(list) do
-			local b = (c.code or 0) % 10
-			if b ~= 2 and b ~= 4 then
-				local d = math.max(abs(c.x - a.x), abs(c.z - a.z))
-				if d < SIT.FLT_MATCH_M then HM_SKIP[i] = true; if d < bd then best, bd = i, d end end
-			end
-		end
-		a.hm = best ~= nil
-		if best then HM_TAKE[best] = a; HM_SKIP[best] = nil end
-	end
+	match_members(list, members, t, HM_TAKE, HM_SKIP, "hm")
 	local n = 0
 	local function put(k, x, z, y, vx, vz, tt, l)
 		if n >= HMC_MAX then return end
@@ -2728,9 +2752,15 @@ local function publish_hmd(t)
 		o.l:set(k == 5 and tostring(l or "") or safe_text(l))
 	end
 	local function callsign(a) return short(a.unit:match("^%a+") or a.unit, 3) .. (a.num or "") end
+	-- v1.3: contacts and SAM sites only out to the range set on the SIT page
+	-- (in a big mission the helmet showed every contact of the picture, at any
+	-- distance). Own flight members are always shown.
+	local lim = SIT.HMD_SIT_RANGE ~= false and G.rng_m or nil
+	local lim2 = lim and lim * lim
+	local function near(x, z) return not lim2 or (x - G.ox) ^ 2 + (z - G.oz) ^ 2 <= lim2 end
 	for i, c in ipairs(list) do
 		local k = HM_KIND[(c.code or 0) % 10]
-		if k and not HM_SKIP[i] then
+		if k and not HM_SKIP[i] and (HM_TAKE[i] or near(c.x, c.z)) then
 			local mem = HM_TAKE[i]
 			if mem then put(2, c.x, c.z, c.y, c.vx, c.vz, c.t, callsign(mem))
 			else put(k, c.x, c.z, c.y, c.vx, c.vz, c.t, (k <= 2) and short(c.nm, 4) or "") end
@@ -2742,7 +2772,7 @@ local function publish_hmd(t)
 	if not stale then
 		for _, g in ipairs(feed.thr or {}) do
 			-- (SAM sites only: early-warning radars have no ring)
-			if (g.ring or 0) > 0 then put(5, g.x, g.z, g.y, 0, 0, t, short((tostring(g.lbl):gsub("^SA%-?", "")), 4)) end
+			if (g.ring or 0) > 0 and near(g.x, g.z) then put(5, g.x, g.z, g.y, 0, 0, t, short((tostring(g.lbl):gsub("^SA%-?", "")), 4)) end
 		end
 	end
 	HM.n:set(n)
@@ -2830,8 +2860,10 @@ local function update_body()
 
 	H.own_y:set(G.own_y)
 	H.own_x:set(G.own_x)
-	H.center:set((ST.center or ST.exp) and 1 or 0)
+	H.center:set(ST.exp and 2 or (ST.center and 1 or 0))     -- (2: EXP, no rose)
+	H.own_vis:set(inside(0, 0) and 1 or 0)
 	H.rng:set(RL[rng])
+	G.rng_m = RL[rng] * NM                 -- (the helmet shows contacts out to this range)
 	H.rng_mode:set((ST.form or ST.exp) and 1 or 0)
 	H.rngt:set(ST.exp and ("E" .. SIT.EXP_NM) or (ST.form and ("F" .. RL[1])) or "")
 	H.page:set(ST.page)
@@ -2863,7 +2895,24 @@ local function update_body()
 
 	local s = feed.status or 0
 	local ewr = EWR.fresh(t) and (stale or s % 2 == 0)
-	if ewr then
+	-- nothing at all from the export script since the cockpit started: the
+	-- Export.lua line is missing or broken (or the server blocks export).
+	-- Said on the status line and once in the log.
+	G.t_start = G.t_start or t
+	if t < G.t_start then G.t_start = t end
+	local no_exp = not feed.exp_t and t - G.t_start >= SIT.NO_EXPORT_S
+	if no_exp and not G.no_exp_logged then
+		G.no_exp_logged = true
+		log("no data from Scripts\\F15SIT_Export.lua after " .. SIT.NO_EXPORT_S .. " s: check that Saved Games\\DCS\\Scripts\\Export.lua"
+			.. " has the F15SIT_Export.lua line and that no line above it errors (dcs.log), or the server blocks export."
+			.. " Without it: no stores pages, no helmet view, no datalink picture")
+	elseif feed.exp_t and G.no_exp_logged and not G.exp_late_logged then
+		G.exp_late_logged = true
+		log("export data arrived (late)")
+	end
+	if no_exp and not ewr then
+		H.status:set("NO EXPORT DATA")
+	elseif ewr then
 		H.status:set("DL EWR REPORTS")
 	elseif stale then
 		H.status:set(udp and "NO DL" or "NO LINK SOCKET")

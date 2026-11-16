@@ -6,7 +6,8 @@
 # INSTALL:
 #   1. copies Scripts\F15SIT_Export.lua and Scripts\Hooks\F15SIT_hook.lua
 #      into Saved Games\DCS\Scripts (and \Hooks)
-#   2. adds one line to Saved Games\DCS\Scripts\Export.lua (once)
+#   2. adds one line at the top of Saved Games\DCS\Scripts\Export.lua (once;
+#      moved up if an older version put it further down)
 #   3. puts the add-on's controls (Options > Controls > F-15C, category
 #      "F-15C SIT") into the F-15C's controls files in the DCS install:
 #      <DCS>\Mods\aircraft\F-15C\Input\joystick|keyboard\default.lua get one
@@ -39,6 +40,7 @@ $L1 = [System.Text.Encoding]::GetEncoding(28591)                   # bytes <-> t
 $SEP = [System.IO.Path]::DirectorySeparatorChar
 $ExpComment = "-- F-15C SIT (WW) add-on (SIT page data: radar, datalink, cursor, countermeasures)"
 $ExpLine = "pcall(function() local l=require('lfs'); dofile(l.writedir()..'Scripts/F15SIT_Export.lua') end)"
+$BOM = [string][char]0xEF + [char]0xBB + [char]0xBF                  # UTF-8 byte order mark, as Latin-1 text
 $BindBegin = "-- F-15C SIT (WW) BINDS BEGIN"
 $BindEnd = "-- F-15C SIT (WW) BINDS END"
 $BindRel = "Mods\aircraft\F-15C\Input"
@@ -104,18 +106,38 @@ function Check-Export($exp) {
 		throw ("Scripts\Export.lua is saved as UTF-16 ('Unicode') - DCS cannot read it like that.`n  Open it in Notepad, File > Save As..., Encoding UTF-8, then run this again.`n    " + $exp)
 	}
 }
+# the first line of code (not empty, not a comment), -1 if none
+function First-CodeLine($c) {
+	for ($i = 0; $i -lt $c.Count; $i++) {
+		$l = $c[$i].Trim()
+		if ($i -eq 0 -and $l.StartsWith($BOM, [System.StringComparison]::Ordinal)) { $l = $l.Substring($BOM.Length).Trim() }
+		if ($l -ne "" -and -not $l.StartsWith("--", [System.StringComparison]::Ordinal)) { return $i }
+	}
+	return -1
+}
+# v1.3: our line goes at the TOP of Export.lua. A line of another tool that
+# fails (e.g. a dofile of a script that was uninstalled, without pcall) stops
+# DCS reading the file there, and a line below it never runs. Our own line
+# is in a pcall, so it can never stop the lines after it. A line of ours
+# further down (older versions) is moved up.
 function Add-ExportLine($exp) {
 	$s = ""
 	if (IsFile $exp) { $s = ReadL1 $exp } else { Ensure-Dir ([System.IO.Path]::GetDirectoryName($exp)) }
 	$p = Split-Lines $s
-	foreach ($l in $p.c) { if (Is-ActiveExportLine $l) { return "line already there" } }
+	$k = First-CodeLine $p.c
+	if ($k -ge 0 -and (Is-ActiveExportLine $p.c[$k])) { return "line already there (at the top)" }
+	$had = $false
+	foreach ($l in $p.c) { if (Is-ActiveExportLine $l) { $had = $true } }
+	if ($had) { [void](Remove-ExportLine $exp); $s = ReadL1 $exp }
+	$bom = ""
+	if ($s.StartsWith($BOM, [System.StringComparison]::Ordinal)) { $bom = $BOM; $s = $s.Substring($BOM.Length) }
 	$nl = "`r`n"
 	if ($s.IndexOf("`r`n", [System.StringComparison]::Ordinal) -lt 0 -and $s.IndexOf([char]10) -ge 0) { $nl = "`n" }
-	if ($s.Length -eq 0) { $add = $ExpComment + $nl + $ExpLine + $nl }
-	elseif ($p.t[$p.t.Count - 1] -eq "") { $add = $nl + $nl + $ExpComment + $nl + $ExpLine }
-	else { $add = $nl + $ExpComment + $nl + $ExpLine + $nl }
-	WriteL1 $exp ($s + $add)
-	return "line added"
+	$top = $ExpComment + $nl + $ExpLine + $nl
+	if ($s.Trim().Length -gt 0) { $top = $top + $nl }
+	WriteL1 $exp ($bom + $top + $s.TrimStart([char]13, [char]10))
+	if ($had) { return "line moved to the top" }
+	return "line added (at the top)"
 }
 function Remove-ExportLine($exp) {
 	if (-not (IsFile $exp)) { return 0 }

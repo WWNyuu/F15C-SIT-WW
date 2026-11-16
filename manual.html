@@ -201,14 +201,14 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
     <a href="./#pages">Pages</a>
     <a href="./#dtm">DTM Planner</a>
     <a href="manual.html" aria-current="page">Pilot manual</a>
-    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.2/F-15C.SIT.WW.1.2.zip">Download v1.2</a>
+    <a href="https://github.com/WWNyuu/F15C-SIT-WW/releases/download/1.3/F-15C.SIT.WW.1.3.zip">Download v1.3</a>
   </nav>
 </div></header>
 <div class="wrap man">
-  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#radio-panel">Front radio panel, IFF and lights</a></li><li><a href="#jhmcs">JHMCS helmet display</a></li><li><a href="#radar-acquisition">Radar acquisition and weapon switches</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
+  <aside class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#before-you-fly">Before you fly</a></li><li><a href="#power-and-start-up">Power and start-up</a></li><li><a href="#the-bezel">The bezel and moving between pages</a></li><li><a href="#sit-page">SIT page</a></li><li><a href="#sit-settings">SIT settings</a></li><li><a href="#aa-and-stores">A/A, combat jettison and weapon load</a></li><li><a href="#cmd-programs">CMD programs</a></li><li><a href="#radio">RADIO</a></li><li><a href="#dtm-and-cartridges">DTM and cartridges</a></li><li><a href="#time-own-data-flight-data">TIME / DATE, OWN DATA, FLIGHT DATA, BIT</a></li><li><a href="#sit-lock">SIT radar lock</a></li><li><a href="#radio-panel">Front radio panel, IFF and lights</a></li><li><a href="#jhmcs">JHMCS helmet display</a></li><li><a href="#radar-acquisition">Radar acquisition and weapon switches</a></li><li><a href="#hotas-and-keybinds">HOTAS and keybinds</a></li><li><a href="#datalink-and-servers">Datalink and servers</a></li><li><a href="#using-the-dtm-planner">Using the DTM Planner</a></li><li><a href="#options-and-troubleshooting">Options and troubleshooting</a></li></ol></aside>
   <article class="doc">
     <h1>F-15C SIT Pilot Manual</h1>
-    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.2: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C, the JHMCS helmet display, the radar acquisition switches on the HOTAS, and the clickable front radio, IFF and exterior light controls.</p>
+    <p class="lead2">How to fly with the F-15C SIT (WW) add-on v1.3: the SIT page and its menu pages on the lower-left MPCD of the Flaming Cliffs F-15C, the JHMCS helmet display, the radar acquisition switches on the HOTAS, the SIT radar lock, and the clickable front radio, IFF and exterior light controls.</p>
 <h2 id="before-you-fly">Before you fly</h2>
 
 <p>You need DCS World with the F-15C from Flaming Cliffs. Nothing else is required; <a href="https://github.com/ciribob/DCS-SimpleRadioStandalone">SRS</a> is used by the RADIO page if you have it.</p>
@@ -356,6 +356,17 @@ td:first-child { font-family: var(--mono); color: var(--red); white-space: nowra
 <li>The yellow line under the cards says what the next press does. Flight members are drawn in cyan with their number on the SIT page and the helmet. The flight is remembered between flights; a cartridge's flight list fills the other slots and leaves yours where it is.</li>
 </ul>
 <p><strong>BIT</strong> shows CBIT (continuous) or IBIT (a 6 second test) with the jet's failed systems as NO GO lines.</p>
+
+<h2 id="sit-lock">SIT radar lock</h2>
+
+<p>New in 1.3: lock the radar onto a contact you pick on the SIT page.</p>
+<ol>
+<li>Castle up: the SIT page has the cursor.</li>
+<li>Put the cursor on a contact until its data block shows top left (the contact is hooked).</li>
+<li>Press your normal radar lock key. The radar takes the cursor back, slews onto that contact and locks it.</li>
+</ol>
+<p>The radar sets search, the smallest range scale that holds the contact and the scan height on its altitude, waits until its beam paints the contact and locks it. It locks only what the radar itself can see: within 60&deg; of the nose and inside its range, so a datalink-only contact behind you will not lock. It gives up after 15 s and the cursor is yours again. FC3 sees your lock key too and may lock what is under its own cursor first: such a lock is dropped and the add-on tries again. Everything it does is written to <code>Logs\f15sit_acq.log</code>.</p>
+<p>Also in 1.3: the helmet shows contacts and SAM rings only out to the SIT page's range (your flight always; <code>SIT.HMD_SIT_RANGE = false</code> in <code>sit_config.lua</code> for all), and the status line shows <strong>NO EXPORT DATA</strong> when the export script sends nothing (run INSTALL.bat again and check <code>Saved Games\DCS\Scripts\Export.lua</code>).</p>
 
 <h2 id="radio-panel">Front radio panel, IFF and lights</h2>
 
